@@ -2,7 +2,7 @@ import {
   type Entry, type SessionState, type ContentBlock, type Usage,
   newSessionTokens, newLensState,
 } from "./types";
-import { addUsage, contextTokens, contextLimit, estimateCostUSD } from "./tokens";
+import { addUsage, contextTokens, effectiveContextLimit, estimateCostUSD } from "./tokens";
 
 function basename(p: string): string {
   const parts = p.replace(/\/+$/, "").split("/");
@@ -12,7 +12,7 @@ function basename(p: string): string {
 export const TOOL_ICONS: Record<string, string> = {
   Bash: "⚙", Edit: "✎", Write: "✎", Read: "",
   Grep: "", Glob: "", WebSearch: "", WebFetch: "",
-  Task: "\u{1f916}", Skill: "\u{1f3af}", TodoWrite: "☑", default: "◈",
+  Task: "◆", Skill: "✦", TodoWrite: "☑", default: "◈",
 };
 function toolIcon(name: string): string { return TOOL_ICONS[name] ?? TOOL_ICONS.default!; }
 
@@ -131,7 +131,7 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
     );
     s.tokens = { ...s.tokens, input: t.input, output: t.output, cacheRead: t.cacheRead, cacheCreate: t.cacheCreate };
     const ctx = contextTokens(usage);
-    if (ctx > 0) { s.tokens.contextTokens = ctx; s.tokens.contextPct = ctx / contextLimit(s.model); }
+    if (ctx > 0) { s.tokens.contextTokens = ctx; s.tokens.contextPct = ctx / effectiveContextLimit(s.model, ctx); }
     s.tokens.webCalls += (usage.server_tool_use?.web_search_requests ?? 0) + (usage.server_tool_use?.web_fetch_requests ?? 0);
     s.costUSD = estimateCostUSD(t, s.model);
   }

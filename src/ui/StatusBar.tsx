@@ -1,5 +1,5 @@
 import type { SessionState } from "../core/types";
-import { contextLimit } from "../core/tokens";
+import { effectiveContextLimit } from "../core/tokens";
 import { theme } from "./theme";
 import { gaugeBar, fmtCost, fmtTokens } from "./format";
 
@@ -19,11 +19,11 @@ export function StatusBar({ session, marker, elapsedMs }: Props) {
   const pct = session.tokens.contextPct;
   const pctColor = pct > 0.85 ? theme.err : pct > 0.6 ? theme.warn : theme.ok;
   return (
-    <box style={{ flexDirection: "row", gap: 2 }}>
+    <box style={{ flexDirection: "row", gap: 1 }}>
       <text fg={theme.dim}>ctx </text>
       <text fg={pctColor}>{gaugeBar(pct, 10)}</text>
       <text fg={pctColor}>{Math.round(pct * 100) + "%"}</text>
-      <text fg={theme.dim}>{fmtTokens(session.tokens.contextTokens, contextLimit(session.model))}</text>
+      <text fg={theme.dim}>{fmtTokens(session.tokens.contextTokens, effectiveContextLimit(session.model, session.tokens.contextTokens))}</text>
       <text fg={theme.ok}>{fmtCost(session.costUSD)}</text>
       <text fg={theme.dim}>{fmtElapsed(elapsedMs)}</text>
       <text fg={theme.accent}>{marker}</text>

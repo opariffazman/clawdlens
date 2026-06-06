@@ -9,6 +9,14 @@ export function contextLimit(model: string): number {
   return DEFAULT_LIMIT;
 }
 
+// The transcript's `message.model` field does not encode the [1m] variant, so a
+// session whose observed context exceeds the standard window must be on a
+// larger one. Infer it from the data so the gauge never reads above 100%.
+export function effectiveContextLimit(model: string, contextTokens: number): number {
+  const base = contextLimit(model);
+  return contextTokens > base ? MILLION : base;
+}
+
 // USD per million tokens. Approximate; labeled as estimate in the UI.
 interface Price { in: number; out: number; cacheRead: number; cacheWrite: number }
 const PRICES: { match: RegExp; price: Price }[] = [

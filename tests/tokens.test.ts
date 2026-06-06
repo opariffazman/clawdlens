@@ -1,9 +1,15 @@
 import { test, expect } from "bun:test";
-import { contextLimit, contextTokens, addUsage, estimateCostUSD } from "../src/core/tokens";
+import { contextLimit, effectiveContextLimit, contextTokens, addUsage, estimateCostUSD } from "../src/core/tokens";
 
 test("context limit: 1m variants vs default", () => {
   expect(contextLimit("claude-opus-4-8")).toBe(200_000);
   expect(contextLimit("claude-opus-4-8[1m]")).toBe(1_000_000);
+});
+
+test("effectiveContextLimit infers 1M when observed context exceeds the standard window", () => {
+  expect(effectiveContextLimit("claude-opus-4-8", 50_000)).toBe(200_000);
+  expect(effectiveContextLimit("claude-opus-4-8", 472_000)).toBe(1_000_000); // would have read 236%
+  expect(effectiveContextLimit("claude-opus-4-8[1m]", 50_000)).toBe(1_000_000);
 });
 
 test("contextTokens sums input + cache read + cache create", () => {

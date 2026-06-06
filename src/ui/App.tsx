@@ -70,7 +70,7 @@ export function App({ store }: { store: Store }) {
     if (player.mode() === "history") return `⏪ ${player.cursor()}/${player.all().length}`;
     if (player.mode() === "paused") return "⏸ paused";
     const back = player.backlog();
-    return back > 0 ? `▸ +${back} catching up` : "▸ live";
+    return back > 0 ? `▸+${back}` : "▸ live";
   })();
 
   return (
