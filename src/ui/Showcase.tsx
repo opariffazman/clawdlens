@@ -4,7 +4,6 @@ import { truncate } from "./format";
 import { PhaseRibbon } from "./PhaseRibbon";
 import { StatusBar } from "./StatusBar";
 import { Flow } from "./panels/Flow";
-import { Log } from "./panels/Log";
 import { Files } from "./panels/Files";
 import { Todos } from "./panels/Todos";
 import { Git } from "./panels/Git";
@@ -12,8 +11,8 @@ import type { Beat } from "../core/types";
 import type { Commit } from "../core/types";
 import { usePowerline, POWERLINE_RIGHT } from "./icons";
 
-export type PanelId = "flow" | "files" | "todos" | "log" | "git";
-export const PANELS: PanelId[] = ["flow", "files", "todos", "log", "git"];
+export type PanelId = "flow" | "files" | "todos" | "git";
+export const PANELS: PanelId[] = ["flow", "files", "todos", "git"];
 
 interface Props {
   session: SessionState | null;
@@ -60,7 +59,6 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
       {/* body — absorbs the slack */}
       <box style={{ flexGrow: 1, flexShrink: 1, marginTop: 1 }}>
         {panel === "flow" && <Flow beats={presented} cursor={cursor} pulse={pulse} width={width - 4} height={bodyHeight} />}
-        {panel === "log" && <Log beats={presented} height={bodyHeight} />}
         {panel === "files" && <Files heat={session.fileHeat} height={bodyHeight} />}
         {panel === "todos" && <Todos todos={session.todos} height={bodyHeight} />}
         {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} />}
