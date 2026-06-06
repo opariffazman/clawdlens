@@ -4,7 +4,7 @@ import { parseLine } from "../core/parse";
 import { newSession, applyEntry } from "../core/reducer";
 import { deriveStatus } from "../core/status";
 import { detectLens } from "../core/lens";
-import { loadBeats } from "../core/loadTranscript";
+import { loadBeats, loadSession } from "../core/loadTranscript";
 import type { SessionState } from "../core/types";
 
 export interface StoreOpts { root?: string; pollMs?: number; backfillBytes?: number }
@@ -92,6 +92,12 @@ export function createStore(opts: StoreOpts = {}) {
     fullBeats(id: string) {
       const s = map.get(id);
       return s ? loadBeats(s.file) : [];
+    },
+    // full-session fold for the aggregate detail panels (Files heatmap, Tasks,
+    // git cwd) — whole-session counts, not just the live backfill window
+    fullSession(id: string): SessionState | null {
+      const s = map.get(id);
+      return s ? loadSession(s.file) : null;
     },
   };
 }

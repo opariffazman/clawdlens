@@ -1,18 +1,24 @@
 import { readFileSync } from "node:fs";
 import { parseLine } from "./parse";
 import { newSession, applyEntry } from "./reducer";
-import type { Beat } from "./types";
+import type { Beat, SessionState } from "./types";
 
-// Read an ENTIRE transcript file (no EOF/backfill window) and fold it into the
-// full ordered beat list — used for cinematic replay from event #1.
-export function loadBeats(file: string): Beat[] {
+// Fold an ENTIRE transcript file (no EOF/backfill window) into a complete
+// SessionState. Used by replay (full beats from event #1) and by the aggregate
+// detail panels (Files heatmap, Tasks) which need whole-session counts — the
+// live store only keeps the recent backfill window.
+export function loadSession(file: string, now = 0): SessionState {
+  const s = newSession("full", file);
   let text = "";
-  try { text = readFileSync(file, "utf8"); } catch { return []; }
-  let s = newSession("replay", file);
-  const now = 0;
+  try { text = readFileSync(file, "utf8"); } catch { return s; }
+  let cur = s;
   for (const raw of text.split("\n")) {
     const entry = parseLine(raw);
-    if (entry) s = applyEntry(s, entry, now);
+    if (entry) cur = applyEntry(cur, entry, now);
   }
-  return s.beats;
+  return cur;
+}
+
+export function loadBeats(file: string): Beat[] {
+  return loadSession(file).beats;
 }

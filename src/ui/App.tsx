@@ -27,6 +27,7 @@ export function App({ store }: { store: Store }) {
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
   const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
   const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
+  const [full, setFull] = useState<import("../core/types").SessionState | null>(null);
 
   useEffect(() => {
     const unsub = store.subscribe(() => setSessions(store.sessions()));
@@ -49,10 +50,18 @@ export function App({ store }: { store: Store }) {
   const selected = sessions[Math.min(sel, Math.max(0, sessions.length - 1))] ?? null;
   const players = usePlayers(sessions, selected?.id ?? null);
 
+  // aggregate detail panels (files/tasks/git) read the FULL session, not just
+  // the live backfill window — so heat counts differ and tasks/cwd are complete
   useEffect(() => {
-    if (panel === "git" && selected?.cwd) setCommits(gitLog(selected.cwd));
-    else if (panel !== "git") setCommits([]);
-  }, [panel, selected?.id, selected?.cwd]);
+    if (!selected) { setFull(null); setCommits([]); return; }
+    if (panel === "files" || panel === "tasks" || panel === "git") {
+      const fs = store.fullSession(selected.id);
+      setFull(fs);
+      setCommits(panel === "git" && fs?.cwd ? gitLog(fs.cwd) : []);
+    } else {
+      setCommits([]);
+    }
+  }, [panel, selected?.id]);
   const player = selected ? players.get(selected.id) : null;
   const activePlayer = replay.player ?? player;
 
@@ -78,7 +87,7 @@ export function App({ store }: { store: Store }) {
       case "pulse": setPulse((p) => !p); break;
       case "lens": setLensOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
-      case "rescan": store.pollOnce(Date.now()); if (panel === "git" && selected?.cwd) setCommits(gitLog(selected.cwd)); break;
+      case "rescan": store.pollOnce(Date.now()); if (selected && (panel === "files" || panel === "tasks" || panel === "git")) { const fs = store.fullSession(selected.id); setFull(fs); if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd) : []); } break;
       case "replay": {
         if (replay.player) { setReplay({ player: null }); break; }
         if (!selected) break;
@@ -117,6 +126,7 @@ export function App({ store }: { store: Store }) {
         width={w - listWidth}
         height={h}
         commits={commits}
+        full={full}
       />
       {showHelp && (
         <box style={{ position: "absolute", border: true, padding: 1, backgroundColor: theme.panel }} title="keys">
