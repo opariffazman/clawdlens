@@ -1,6 +1,7 @@
 import type { FileHeat } from "../../core/types";
 import { theme } from "../theme";
 import { gaugeBar, truncate } from "../format";
+import { useReveal } from "../useReveal";
 
 export function Files({ heat, height }: { heat: Record<string, FileHeat>; height: number }) {
   const entries = Object.entries(heat)
@@ -8,10 +9,11 @@ export function Files({ heat, height }: { heat: Record<string, FileHeat>; height
     .sort((a, b) => b.score - a.score)
     .slice(0, height);
   const max = Math.max(1, ...entries.map((e) => e.score));
+  const { revealed } = useReveal(entries.length, heat);
   if (entries.length === 0) return <text fg={theme.dim}>no files touched yet</text>;
   return (
     <box style={{ flexDirection: "column" }}>
-      {entries.map((e) => (
+      {entries.slice(0, revealed).map((e) => (
         <box key={e.file} style={{ flexDirection: "row", gap: 1 }}>
           <text fg={theme.warn}>{gaugeBar(e.score / max, 8)}</text>
           <text fg={theme.fg}>{truncate(e.file, 28)}</text>

@@ -1,15 +1,14 @@
-import { useEffect, useState } from "react";
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { layoutGitGraph } from "../../core/git-graph";
 import { ROW_STRIDE } from "../../core/flow-layout";
 import type { Commit } from "../../core/types";
 import { theme } from "../theme";
 import { pulseIntensity, lerpHex } from "../anim";
+import { useReveal } from "../useReveal";
 
 const ICON_COL = 4;
 const COL_WIDTH = 2;
 const TAIL = 4;
-const REVEAL_MS = 80; // per-commit reveal cadence
 const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0);
 
 function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA, bg: RGBA) {
@@ -18,19 +17,10 @@ function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RG
 
 export function Git({ commits, width, height }: { commits: Commit[]; width: number; height: number }) {
   const total = commits.length;
-  const [revealed, setRevealed] = useState(1);
-
-  // restart the build-up whenever the commit set changes (panel reopened / session switched)
-  useEffect(() => { setRevealed(1); }, [commits]);
-  useEffect(() => {
-    if (revealed >= total) return;
-    const id = setInterval(() => setRevealed((r) => Math.min(total, r + 1)), REVEAL_MS);
-    return () => clearInterval(id);
-  }, [revealed, total]);
+  const { revealed, animating } = useReveal(total, commits);
 
   if (total === 0) return <text fg={theme.dim}>not a git repo (or no commits)</text>;
 
-  const animating = revealed < total;
   const graph = layoutGitGraph(commits.slice(0, revealed)); // lay out only revealed commits
   const dimWire = RGBA.fromHex(theme.wireDim);
   const nodeColor = RGBA.fromHex(theme.accent);
