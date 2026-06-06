@@ -17,6 +17,8 @@ export function App({ store }: { store: Store }) {
   const [pulse, setPulse] = useState(true);
   const [blink, setBlink] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [lensOn, setLensOn] = useState(true);
+  const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
 
   useEffect(() => {
     const unsub = store.subscribe(() => setSessions(store.sessions()));
@@ -24,6 +26,11 @@ export function App({ store }: { store: Store }) {
   }, [store]);
   useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
   useEffect(() => { const id = setInterval(() => setBlink((b) => !b), 500); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    const onResize = (cols: number, rows: number) => setSize({ w: cols, h: rows });
+    renderer.on("resize", onResize);
+    return () => { renderer.off("resize", onResize); };
+  }, [renderer]);
 
   const selected = sessions[Math.min(sel, Math.max(0, sessions.length - 1))] ?? null;
   const players = usePlayers(sessions, selected?.id ?? null);
@@ -49,14 +56,13 @@ export function App({ store }: { store: Store }) {
       case "speed-up": player?.setSpeed((player.speed() || 1) * 1.5); break;
       case "speed-down": player?.setSpeed((player.speed() || 1) / 1.5); break;
       case "pulse": setPulse((p) => !p); break;
-      case "lens": /* lens toggle handled by hiding ribbon; toggle via state if desired */ break;
+      case "lens": setLensOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
       case "rescan": store.pollOnce(Date.now()); break;
     }
   });
 
-  const w = renderer.terminalWidth ?? 120;
-  const h = renderer.terminalHeight ?? 40;
+  const { w, h } = size;
   const listWidth = Math.min(30, Math.floor(w * 0.28));
 
   const marker = (() => {
@@ -76,6 +82,7 @@ export function App({ store }: { store: Store }) {
         presented={player ? player.presented() : []}
         cursor={player ? player.cursor() : 0}
         pulse={pulse}
+        lensOn={lensOn}
         marker={marker}
         width={w - listWidth}
         height={h}

@@ -18,12 +18,13 @@ interface Props {
   presented: Beat[];
   cursor: number;
   pulse: boolean;
+  lensOn: boolean;
   marker: string;
   width: number;
   height: number;
 }
 
-export function Showcase({ session, panel, presented, cursor, pulse, marker, width, height }: Props) {
+export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -34,7 +35,7 @@ export function Showcase({ session, panel, presented, cursor, pulse, marker, wid
   const bodyHeight = height - 6;
   return (
     <box style={{ flexGrow: 1, border: true, flexDirection: "column", padding: 1 }}>
-      <PhaseRibbon lens={session.lens} />
+      <PhaseRibbon lens={lensOn ? session.lens : { ...session.lens, lensId: null }} />
       <text fg={theme.fg}>{`● ${session.project} · ${session.gitBranch || "?"} · ${session.model}`}</text>
       <text fg={theme.dim}>{truncate(session.title || session.lastPrompt, width - 6)}</text>
       <box style={{ flexDirection: "row", gap: 1 }}>
@@ -48,7 +49,7 @@ export function Showcase({ session, panel, presented, cursor, pulse, marker, wid
         {panel === "files" && <Files heat={session.fileHeat} height={bodyHeight} />}
         {panel === "todos" && <Todos todos={session.todos} height={bodyHeight} />}
       </box>
-      <StatusBar session={session} marker={marker} elapsedMs={session.lastActivityTs - session.startedTs} />
+      <StatusBar session={session} marker={marker} elapsedMs={Math.max(0, session.lastActivityTs - session.startedTs)} />
     </box>
   );
 }
