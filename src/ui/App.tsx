@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useKeyboard, useRenderer } from "@opentui/react";
+import { RGBA } from "@opentui/core";
 import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
@@ -8,6 +9,9 @@ import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { theme } from "./theme";
 
 type Store = ReturnType<typeof createStore>;
+
+// transparent canvas → inherit the user's terminal background (OLED-friendly)
+const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0);
 
 export function App({ store }: { store: Store }) {
   const renderer = useRenderer();
@@ -74,7 +78,7 @@ export function App({ store }: { store: Store }) {
   })();
 
   return (
-    <box style={{ flexDirection: "row", width: w, height: h, backgroundColor: theme.bg }}>
+    <box style={{ flexDirection: "row", width: w, height: h, backgroundColor: TRANSPARENT }}>
       <SessionList sessions={sessions} selectedIndex={sel} blink={blink} width={listWidth} height={h} />
       <Showcase
         session={selected}

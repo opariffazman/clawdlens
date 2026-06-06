@@ -14,6 +14,7 @@ interface Props {
 
 const ICON_COL = 6; // x where node icon/label start (after the gutter)
 const TAIL = 4; // pulse tail length in cells
+const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0); // inherit the terminal background
 
 // Safe fallback that uses only setCell; we prefer buffer.drawText where possible.
 function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA, bg: RGBA) {
@@ -22,7 +23,7 @@ function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RG
 
 export function Flow({ beats, cursor, pulse, width, height }: Props) {
   const graph = layoutFlow(beats);
-  const bg = RGBA.fromHex(theme.bg);
+  const bg = TRANSPARENT; // cell background stays transparent so the terminal bg shows through
   const dimWire = RGBA.fromHex(theme.wireDim);
 
   // viewport: center on the cursor, clamped so we never scroll past the ends.
@@ -31,11 +32,11 @@ export function Flow({ beats, cursor, pulse, width, height }: Props) {
 
   return (
     <box
-      style={{ width, height, backgroundColor: theme.bg }}
+      style={{ width, height, backgroundColor: TRANSPARENT }}
       buffered
       live={pulse}
       renderAfter={(buffer: OptimizedBuffer) => {
-        buffer.fillRect(0, 0, width, height, bg);
+        buffer.clear(TRANSPARENT); // reset to transparent each frame (no ghosting, no forced bg)
         const now = (globalThis.performance?.now?.() ?? 0) / 120; // pulse head speed
         const span = total + TAIL;
         const headRow = total > 0 ? now % span : 0;
