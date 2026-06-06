@@ -1,6 +1,7 @@
 import type { LensState } from "../core/types";
 import { SUPERPOWERS_PHASES } from "../core/lens";
 import { theme } from "./theme";
+import { usePowerline, POWERLINE_RIGHT, POWERLINE_LEFT } from "./icons";
 
 export function PhaseRibbon({ lens }: { lens: LensState }) {
   if (!lens.lensId) return null;
@@ -13,7 +14,10 @@ export function PhaseRibbon({ lens }: { lens: LensState }) {
         const done = lens.phaseHistory.some((h) => h.phase === p) && !active;
         const color = active ? theme.accent : done ? theme.ok : theme.dim;
         return (
-          <text key={p} fg={color}>{p}{i < phases.length - 1 ? (active ? " ▸" : " ─") : ""}</text>
+          <text key={p} fg={color}>
+            {active && usePowerline() ? `${POWERLINE_LEFT}${p}${POWERLINE_RIGHT}` : p}
+            {i < phases.length - 1 ? (active ? " ▸" : " ─") : ""}
+          </text>
         );
       })}
     </box>

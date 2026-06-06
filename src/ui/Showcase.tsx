@@ -8,6 +8,7 @@ import { Log } from "./panels/Log";
 import { Files } from "./panels/Files";
 import { Todos } from "./panels/Todos";
 import type { Beat } from "../core/types";
+import { usePowerline, POWERLINE_RIGHT } from "./icons";
 
 export type PanelId = "flow" | "files" | "todos" | "log";
 export const PANELS: PanelId[] = ["flow", "files", "todos", "log"];
@@ -41,10 +42,16 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
         <PhaseRibbon lens={lensOn ? session.lens : { ...session.lens, lensId: null }} />
         <text fg={theme.fg}>{`● ${session.project} · ${session.gitBranch || "?"} · ${session.model}`}</text>
         <text fg={theme.dim}>{truncate(session.title || session.lastPrompt, width - 6)}</text>
-        <box style={{ flexDirection: "row", gap: 1 }}>
-          {PANELS.map((p) => (
-            <text key={p} fg={p === panel ? theme.accent : theme.dim}>{p === panel ? `[${p}]` : ` ${p} `}</text>
-          ))}
+        <box style={{ flexDirection: "row" }}>
+          {PANELS.map((p, i) => {
+            const active = p === panel;
+            const sep = usePowerline() ? POWERLINE_RIGHT : " ";
+            return (
+              <text key={p} fg={active ? theme.accent : theme.dim}>
+                {active ? `${sep}${p}${sep}` : ` ${p} `}
+              </text>
+            );
+          })}
         </box>
       </box>
       {/* body — absorbs the slack */}
