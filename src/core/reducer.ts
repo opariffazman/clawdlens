@@ -147,20 +147,20 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
       if (text) { pushBeat(s, { ts, kind: "text", icon: "○", label: "says", detail: text.slice(0, 80), lane, skill: e.attributionSkill }); s.lastBlockKind = "text"; }
     } else if (b.type === "tool_use") {
       const name = b.name ?? "Tool";
-      s.toolStats[name] = (s.toolStats[name] ?? 0) + 1;
+      s.toolStats = { ...s.toolStats, [name]: (s.toolStats[name] ?? 0) + 1 };
       if (name === "Skill") {
         const skill = String(b.input?.skill ?? "skill");
         pushBeat(s, { ts, kind: "skill", icon: TOOL_ICONS.Skill!, label: skill, lane, toolUseId: b.id, skill });
       } else if (name === "Task") {
         const sub = String(b.input?.subagent_type ?? b.input?.description ?? "subagent");
         pushBeat(s, { ts, kind: "tool", icon: TOOL_ICONS.Task!, label: `Task · ${sub}`, lane, toolUseId: b.id, skill: e.attributionSkill });
-        if (b.id) { s.openLanes = [...s.openLanes, b.id]; s.pendingTools[b.id] = s.beats[s.beats.length - 1]!.id; }
+        if (b.id) { s.openLanes = [...s.openLanes, b.id]; s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id }; }
       } else {
         const detail = name === "Bash"
           ? (typeof b.input?.description === "string" ? b.input.description as string : (typeof b.input?.command === "string" ? (b.input.command as string).slice(0, 60) : undefined))
           : fileOf(b.input) ?? (typeof b.input?.query === "string" ? (b.input.query as string).slice(0, 60) : undefined);
         pushBeat(s, { ts, kind: "tool", icon: toolIcon(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill });
-        if (b.id) s.pendingTools[b.id] = s.beats[s.beats.length - 1]!.id;
+        if (b.id) s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id };
         bumpHeat(s, name, b.input, ts);
       }
       s.lastBlockKind = "tool_use";
