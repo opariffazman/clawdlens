@@ -60,6 +60,7 @@ tests/
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
+    "bun-types": "^1.3.0",
     "typescript": "^5.6.0"
   }
 }
