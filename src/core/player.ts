@@ -45,7 +45,7 @@ export function createPlayer(opts: PlayerOpts = {}) {
     setBeats(beats: Beat[]) { rebuild(beats); started = true; },
     tick(now: number) {
       if (!started) return;
-      if (!replay && mode !== "live") return;
+      if (mode !== "live") return; // pause/scrub freezes both live and replay
       if (lastAdvanceAt < 0) lastAdvanceAt = now;
       while (head < coalesced.length && now - lastAdvanceAt >= interval()) {
         head += 1;

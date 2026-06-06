@@ -66,15 +66,15 @@ export function App({ store }: { store: Store }) {
       case "jump": setReplay({ player: null }); setSel(Math.min(sessions.length - 1, action.n - 1)); break;
       case "panel-next": setPanel((p) => PANELS[(PANELS.indexOf(p) + 1) % PANELS.length]!); break;
       case "panel-prev": setPanel((p) => PANELS[(PANELS.indexOf(p) + PANELS.length - 1) % PANELS.length]!); break;
-      case "beat-back": player?.stepBack(); break;
-      case "beat-fwd": player?.stepForward(); break;
-      case "chunk-back": for (let i = 0; i < 10; i++) player?.stepBack(); break;
-      case "chunk-fwd": for (let i = 0; i < 10; i++) player?.stepForward(); break;
-      case "to-start": player?.toStart(); break;
-      case "to-live": player?.toLive(); break;
-      case "pause": player && (player.mode() === "paused" ? player.play() : player.pause()); break;
-      case "speed-up": player?.setSpeed((player.speed() || 1) * 1.5); break;
-      case "speed-down": player?.setSpeed((player.speed() || 1) / 1.5); break;
+      case "beat-back": activePlayer?.stepBack(); break;
+      case "beat-fwd": activePlayer?.stepForward(); break;
+      case "chunk-back": for (let i = 0; i < 10; i++) activePlayer?.stepBack(); break;
+      case "chunk-fwd": for (let i = 0; i < 10; i++) activePlayer?.stepForward(); break;
+      case "to-start": activePlayer?.toStart(); break;
+      case "to-live": activePlayer?.toLive(); break;
+      case "pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
+      case "speed-up": activePlayer?.setSpeed((activePlayer.speed() || 1) * 1.5); break;
+      case "speed-down": activePlayer?.setSpeed((activePlayer.speed() || 1) / 1.5); break;
       case "pulse": setPulse((p) => !p); break;
       case "lens": setLensOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
@@ -95,7 +95,7 @@ export function App({ store }: { store: Store }) {
   const listWidth = Math.min(30, Math.floor(w * 0.28));
 
   const marker = (() => {
-    if (replay.player) return `⏮ replay ${replay.player.cursor()}/${replay.player.all().length}${replay.player.isLoop() ? " · ⟳" : ""}`;
+    if (replay.player) return `⏮ replay ${replay.player.cursor()}/${replay.player.all().length}${replay.player.mode() === "paused" ? " ⏸" : ""}${replay.player.isLoop() ? " · ⟳" : ""}`;
     if (!player) return "";
     if (player.mode() === "history") return `⏪ ${player.cursor()}/${player.all().length}`;
     if (player.mode() === "paused") return "⏸ paused";
