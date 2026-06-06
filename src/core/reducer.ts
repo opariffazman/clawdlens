@@ -2,7 +2,7 @@ import {
   type Entry, type SessionState, type ContentBlock, type Usage,
   newSessionTokens, newLensState,
 } from "./types";
-import type { IconKey } from "./types";
+import type { IconKey, TodoItem } from "./types";
 import { addUsage, contextTokens, effectiveContextLimit, estimateCostUSD } from "./tokens";
 
 function basename(p: string): string {
@@ -19,7 +19,7 @@ function iconKeyFor(name: string): IconKey {
     case "WebSearch": case "WebFetch": return "web";
     case "Task": return "task";
     case "Skill": return "skill";
-    case "TodoWrite": return "todo";
+    case "TodoWrite": case "TaskCreate": case "TaskUpdate": return "todo";
     default: return "tool";
   }
 }
@@ -59,6 +59,32 @@ function foldTodos(s: SessionState, input: Record<string, unknown> | undefined):
   }
 }
 
+// Harness task tracker: TaskCreate assigns sequential ids (1,2,3…); TaskUpdate
+// references them. Reconstruct an agnostic task list so the panel works for
+// superpowers/subagent sessions that use TaskCreate/Update instead of TodoWrite.
+function tasksToTodos(tasks: Record<string, TodoItem>): TodoItem[] {
+  return Object.keys(tasks).map(Number).sort((a, b) => a - b).map((id) => tasks[String(id)]!);
+}
+
+function foldTaskCreate(s: SessionState, input: Record<string, unknown> | undefined): void {
+  s.taskSeq += 1;
+  const content = String(input?.subject ?? input?.description ?? "task");
+  s.tasks = { ...s.tasks, [s.taskSeq]: { content, status: "pending" } };
+  s.todos = tasksToTodos(s.tasks);
+}
+
+function foldTaskUpdate(s: SessionState, input: Record<string, unknown> | undefined): void {
+  const id = input?.taskId != null ? String(input.taskId) : "";
+  if (!id || !s.tasks[id]) return;
+  const status = input?.status;
+  if (status === "deleted") {
+    const next = { ...s.tasks }; delete next[id]; s.tasks = next;
+  } else if (status === "pending" || status === "in_progress" || status === "completed") {
+    s.tasks = { ...s.tasks, [id]: { ...s.tasks[id]!, status } };
+  }
+  s.todos = tasksToTodos(s.tasks);
+}
+
 export function newSession(id: string, file: string): SessionState {
   return {
     id, file,
@@ -82,6 +108,8 @@ export function newSession(id: string, file: string): SessionState {
     lastErrored: false,
     openLanes: [],
     beatSeq: 0,
+    tasks: {},
+    taskSeq: 0,
   };
 }
 
@@ -173,6 +201,8 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
       }
       s.lastBlockKind = "tool_use";
       if (name === "TodoWrite") foldTodos(s, b.input);
+      else if (name === "TaskCreate") foldTaskCreate(s, b.input);
+      else if (name === "TaskUpdate") foldTaskUpdate(s, b.input);
     }
   }
 }

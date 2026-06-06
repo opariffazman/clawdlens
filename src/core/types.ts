@@ -141,4 +141,6 @@ export interface SessionState {
   lastErrored: boolean;
   openLanes: string[];           // open subagent lane ids
   beatSeq: number;               // monotonic id source
+  tasks: Record<string, TodoItem>; // reconstructed from harness TaskCreate/TaskUpdate, keyed by task id
+  taskSeq: number;               // sequential id assigned to each TaskCreate
 }

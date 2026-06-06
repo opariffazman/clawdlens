@@ -8,6 +8,24 @@ function feed(entries: Entry[]) {
   return s;
 }
 
+test("harness TaskCreate/TaskUpdate reconstruct an agnostic task list", () => {
+  const s = feed([
+    { type: "assistant", message: { content: [
+      { type: "tool_use", id: "a", name: "TaskCreate", input: { subject: "Scaffold project" } },
+      { type: "tool_use", id: "b", name: "TaskCreate", input: { subject: "Write tests" } },
+      { type: "tool_use", id: "c", name: "TaskCreate", input: { subject: "Drop me" } },
+    ] } },
+    { type: "assistant", message: { content: [
+      { type: "tool_use", id: "d", name: "TaskUpdate", input: { taskId: "1", status: "completed" } },
+      { type: "tool_use", id: "e", name: "TaskUpdate", input: { taskId: "2", status: "in_progress" } },
+      { type: "tool_use", id: "f", name: "TaskUpdate", input: { taskId: "3", status: "deleted" } },
+    ] } },
+  ]);
+  expect(s.todos?.length).toBe(2); // task 3 deleted
+  expect(s.todos?.[0]).toEqual({ content: "Scaffold project", status: "completed" });
+  expect(s.todos?.[1]).toEqual({ content: "Write tests", status: "in_progress" });
+});
+
 test("identity, title, prompt, model and tokens fold in", () => {
   const s = feed([
     { type: "ai-title", aiTitle: "Fix the thing" },
