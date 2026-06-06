@@ -33,6 +33,7 @@ export function Flow({ beats, cursor, pulse, width, height }: Props) {
     <box
       style={{ width, height, backgroundColor: theme.bg }}
       buffered
+      live={pulse}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.fillRect(0, 0, width, height, bg);
         const now = (globalThis.performance?.now?.() ?? 0) / 120; // pulse head speed
