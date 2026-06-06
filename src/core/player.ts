@@ -5,7 +5,7 @@ export type PlayMode = "live" | "paused" | "history";
 
 export function createPlayer(opts: PlayerOpts = {}) {
   const base = opts.baseIntervalMs ?? 1000;
-  const min = opts.minIntervalMs ?? 0;
+  const min = opts.minIntervalMs ?? 120;
   const replay = opts.replay ?? false;
   let loop = opts.loop ?? false;
 
@@ -35,7 +35,8 @@ export function createPlayer(opts: PlayerOpts = {}) {
   function backlog(): number { return coalesced.length - head; }
 
   function interval(): number {
-    if (replay) return Math.max(min, base / speed);
+    // replay plays at a steady cadence at the chosen base (no live min floor, no catch-up)
+    if (replay) return Math.max(1, base / speed);
     const factor = 1 / (1 + Math.min(backlog(), 20) * 0.5);
     return Math.max(min, (base / speed) * factor);
   }

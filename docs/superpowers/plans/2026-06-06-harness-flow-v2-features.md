@@ -405,7 +405,7 @@ In `createPlayer`, after reading `base`/`min`, add:
 Change `interval()` so replay ignores adaptive catch-up (steady cadence):
 ```ts
   function interval(): number {
-    if (replay) return Math.max(min, base / speed);
+    if (replay) return Math.max(1, base / speed); // steady cadence; no live min floor
     const factor = 1 / (1 + Math.min(backlog(), 20) * 0.5);
     return Math.max(min, (base / speed) * factor);
   }
