@@ -68,6 +68,14 @@ export interface Beat {
   skill?: string;                // attributionSkill if present
 }
 
+export interface Commit {
+  hash: string;
+  shortHash: string;
+  parents: string[];
+  refs: string[];   // e.g. "HEAD -> main", "origin/main", "tag: v1"
+  subject: string;
+}
+
 export interface FileHeat {
   reads: number;
   edits: number;
