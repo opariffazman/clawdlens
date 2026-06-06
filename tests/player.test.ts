@@ -38,3 +38,22 @@ test("history navigation: stepBack freezes, toLive resumes", () => {
   p.toLive();
   expect(p.mode()).toBe("live");
 });
+
+test("replay player drains from 0 at base interval and loops", () => {
+  const p = createPlayer({ baseIntervalMs: 100, replay: true, loop: true });
+  p.setBeats([beat("1","A"), beat("2","B"), beat("3","C")]);
+  expect(p.presented().length).toBe(0);
+  for (let t = 0; t <= 100; t += 100) p.tick(t);   // ~1 beat
+  const after1 = p.presented().length;
+  expect(after1).toBeGreaterThanOrEqual(1);
+  for (let t = 200; t <= 1000; t += 100) p.tick(t); // drain past end
+  // looped: head wrapped back to a small count rather than stuck at end
+  expect(p.headIndex()).toBeLessThanOrEqual(3);
+});
+
+test("replay without loop stops at the end", () => {
+  const p = createPlayer({ baseIntervalMs: 1, replay: true, loop: false });
+  p.setBeats([beat("1","A"), beat("2","B")]);
+  for (let t = 0; t <= 100; t += 5) p.tick(t);
+  expect(p.headIndex()).toBe(2); // all shown, then stops
+});

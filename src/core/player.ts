@@ -1,11 +1,13 @@
 import type { Beat } from "./types";
 
-export interface PlayerOpts { baseIntervalMs?: number; minIntervalMs?: number }
+export interface PlayerOpts { baseIntervalMs?: number; minIntervalMs?: number; replay?: boolean; loop?: boolean }
 export type PlayMode = "live" | "paused" | "history";
 
 export function createPlayer(opts: PlayerOpts = {}) {
   const base = opts.baseIntervalMs ?? 1000;
-  const min = opts.minIntervalMs ?? 120;
+  const min = opts.minIntervalMs ?? 0;
+  const replay = opts.replay ?? false;
+  let loop = opts.loop ?? false;
 
   let coalesced: Beat[] = [];
   let head = 0;             // number of coalesced beats presented (live head)
@@ -33,7 +35,7 @@ export function createPlayer(opts: PlayerOpts = {}) {
   function backlog(): number { return coalesced.length - head; }
 
   function interval(): number {
-    // more backlog -> shorter interval (adaptive catch-up)
+    if (replay) return Math.max(min, base / speed);
     const factor = 1 / (1 + Math.min(backlog(), 20) * 0.5);
     return Math.max(min, (base / speed) * factor);
   }
@@ -41,11 +43,16 @@ export function createPlayer(opts: PlayerOpts = {}) {
   return {
     setBeats(beats: Beat[]) { rebuild(beats); started = true; },
     tick(now: number) {
-      if (!started || mode !== "live") return;
+      if (!started) return;
+      if (!replay && mode !== "live") return;
       if (lastAdvanceAt < 0) lastAdvanceAt = now;
       while (head < coalesced.length && now - lastAdvanceAt >= interval()) {
         head += 1;
         lastAdvanceAt += interval();
+      }
+      if (replay && loop && head >= coalesced.length && coalesced.length > 0) {
+        head = 0; // screensaver wrap
+        lastAdvanceAt = now;
       }
       cursor = head;
     },
@@ -56,6 +63,8 @@ export function createPlayer(opts: PlayerOpts = {}) {
     cursor(): number { return cursor; },
     headIndex(): number { return head; },
     setSpeed(mult: number) { speed = Math.max(0.25, Math.min(8, mult)); },
+    setLoop(on: boolean) { loop = on; },
+    isLoop(): boolean { return loop; },
     speed(): number { return speed; },
     pause() { if (mode === "live") mode = "paused"; },
     play() { if (mode === "paused") mode = "live"; },
