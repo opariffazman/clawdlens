@@ -35,10 +35,11 @@ export function createPlayer(opts: PlayerOpts = {}) {
   function backlog(): number { return coalesced.length - head; }
 
   function interval(): number {
-    // one adaptive cadence for live AND replay: faster when far behind, easing
-    // to base as it catches up / nears the end — the whole timeline is "like flow"
-    const factor = 1 / (1 + Math.min(backlog(), 20) * 0.5);
-    return Math.max(min, (base / speed) * factor);
+    // adaptive (eases toward base as it catches up / nears the end), but gentle
+    // enough to stay a readable slow-burn. `speed` divides the WHOLE interval —
+    // including the min floor — so +/- always change the pace.
+    const factor = 1 / (1 + Math.min(backlog(), 20) * 0.1);
+    return Math.max(min, base * factor) / speed;
   }
 
   return {

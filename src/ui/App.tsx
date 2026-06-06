@@ -107,12 +107,15 @@ export function App({ store }: { store: Store }) {
   const listWidth = Math.min(30, Math.floor(w * 0.28));
 
   const marker = (() => {
-    if (replay.player) return `⏮ replay ${replay.player.cursor()}/${replay.player.all().length}${replay.player.mode() === "paused" ? " ⏸" : ""}${replay.player.isLoop() ? " · ⟳" : ""}`;
-    if (!player) return "";
-    if (player.mode() === "history") return `⏪ ${player.cursor()}/${player.all().length}`;
-    if (player.mode() === "paused") return "⏸ paused";
-    const back = player.backlog();
-    return back > 0 ? `▸+${back}` : "▸ live";
+    const sp = activePlayer ? activePlayer.speed() : 1;
+    const spd = ` ${Number(sp.toFixed(2))}×`;
+    let m: string;
+    if (replay.player) m = `⏮ replay ${replay.player.cursor()}/${replay.player.all().length}${replay.player.mode() === "paused" ? " ⏸" : ""}${replay.player.isLoop() ? " · ⟳" : ""}`;
+    else if (!player) return "";
+    else if (player.mode() === "history") m = `⏪ ${player.cursor()}/${player.all().length}`;
+    else if (player.mode() === "paused") m = "⏸ paused";
+    else { const back = player.backlog(); m = back > 0 ? `▸+${back}` : "▸ live"; }
+    return m + spd;
   })();
 
   return (
