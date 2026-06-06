@@ -1,15 +1,14 @@
 import type { FileHeat } from "../../core/types";
 import { theme } from "../theme";
 import { gaugeBar, truncate } from "../format";
-import { useReveal } from "../useReveal";
 
-export function Files({ heat, height }: { heat: Record<string, FileHeat>; height: number }) {
+export function Files({ heat, height, progress }: { heat: Record<string, FileHeat>; height: number; progress: number }) {
   const entries = Object.entries(heat)
     .map(([file, h]) => ({ file, score: h.edits * 2 + h.reads, h }))
     .sort((a, b) => b.score - a.score)
     .slice(0, height);
   const max = Math.max(1, ...entries.map((e) => e.score));
-  const { revealed } = useReveal(entries.length, heat);
+  const revealed = Math.ceil(progress * entries.length); // synced to the Flow cursor
   if (entries.length === 0) return <text fg={theme.dim}>no files touched yet</text>;
   return (
     <box style={{ flexDirection: "column" }}>

@@ -40,7 +40,7 @@ test("history navigation: stepBack freezes, toLive resumes", () => {
 });
 
 test("replay player drains from 0 at base interval and loops", () => {
-  const p = createPlayer({ baseIntervalMs: 100, replay: true, loop: true });
+  const p = createPlayer({ baseIntervalMs: 100, minIntervalMs: 1, replay: true, loop: true });
   p.setBeats([beat("1","A"), beat("2","B"), beat("3","C")]);
   expect(p.presented().length).toBe(0);
   for (let t = 0; t <= 100; t += 100) p.tick(t);   // ~1 beat
@@ -52,7 +52,7 @@ test("replay player drains from 0 at base interval and loops", () => {
 });
 
 test("replay without loop stops at the end", () => {
-  const p = createPlayer({ baseIntervalMs: 1, replay: true, loop: false });
+  const p = createPlayer({ baseIntervalMs: 1, minIntervalMs: 1, replay: true, loop: false });
   p.setBeats([beat("1","A"), beat("2","B")]);
   for (let t = 0; t <= 100; t += 5) p.tick(t);
   expect(p.headIndex()).toBe(2); // all shown, then stops

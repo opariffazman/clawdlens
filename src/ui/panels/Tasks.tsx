@@ -8,7 +8,7 @@ const COLOR = { completed: theme.ok, in_progress: theme.accent, pending: theme.d
 
 // Agnostic task view: shows TodoWrite / reconstructed TaskCreate-TaskUpdate todos
 // if present; otherwise falls back to the superpowers workflow phase checklist.
-export function Tasks({ todos, lens, height }: { todos: TodoItem[] | null; lens: LensState; height: number }) {
+export function Tasks({ todos, lens, height, progress }: { todos: TodoItem[] | null; lens: LensState; height: number; progress: number }) {
   if (todos && todos.length > 0) {
     const done = todos.filter((t) => t.status === "completed").length;
     return (
@@ -17,7 +17,7 @@ export function Tasks({ todos, lens, height }: { todos: TodoItem[] | null; lens:
           <text fg={theme.ok}>{gaugeBar(done / todos.length, 12)}</text>
           <text fg={theme.dim}>{`${done}/${todos.length}`}</text>
         </box>
-        {todos.slice(0, height - 1).map((t, i) => (
+        {todos.slice(0, Math.min(height - 1, Math.ceil(progress * todos.length))).map((t, i) => (
           <box key={i} style={{ flexDirection: "row", gap: 1 }}>
             <text fg={COLOR[t.status]}>{MARK[t.status]}</text>
             <text fg={t.status === "completed" ? theme.dim : theme.fg}>{truncate(t.content, 44)}</text>

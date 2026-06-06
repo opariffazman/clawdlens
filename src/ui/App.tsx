@@ -64,6 +64,9 @@ export function App({ store }: { store: Store }) {
   }, [panel, selected?.id]);
   const player = selected ? players.get(selected.id) : null;
   const activePlayer = replay.player ?? player;
+  // one shared timeline: all panels reveal in sync with the Flow player's cursor
+  const playerTotal = activePlayer ? activePlayer.all().length : 0;
+  const progress = activePlayer && playerTotal > 0 ? activePlayer.cursor() / playerTotal : 1;
 
   useKeyboard((key) => {
     const action = mapKey({ name: key.name, shift: key.shift, ctrl: key.ctrl });
@@ -127,6 +130,7 @@ export function App({ store }: { store: Store }) {
         height={h}
         commits={commits}
         full={full}
+        progress={progress}
       />
       {showHelp && (
         <box style={{ position: "absolute", border: true, padding: 1, backgroundColor: theme.panel }} title="keys">

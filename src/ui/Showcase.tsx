@@ -26,9 +26,10 @@ interface Props {
   height: number;
   commits: Commit[];
   full: SessionState | null; // whole-session fold for aggregate panels
+  progress: number;          // shared 0..1 reveal driven by the Flow player cursor
 }
 
-export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height, commits, full }: Props) {
+export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height, commits, full, progress }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -63,9 +64,9 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
       {/* body — absorbs the slack */}
       <box style={{ flexGrow: 1, flexShrink: 1, marginTop: 1 }}>
         {panel === "flow" && <Flow beats={presented} cursor={cursor} pulse={pulse} width={width - 4} height={bodyHeight} />}
-        {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} />}
-        {panel === "tasks" && <Tasks todos={agg.todos} lens={tasksLens} height={bodyHeight} />}
-        {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} />}
+        {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} />}
+        {panel === "tasks" && <Tasks todos={agg.todos} lens={tasksLens} height={bodyHeight} progress={progress} />}
+        {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} progress={progress} />}
       </box>
       {/* fixed footer */}
       <box style={{ flexShrink: 0 }}>

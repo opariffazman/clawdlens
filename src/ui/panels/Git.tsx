@@ -4,7 +4,6 @@ import { ROW_STRIDE } from "../../core/flow-layout";
 import type { Commit } from "../../core/types";
 import { theme } from "../theme";
 import { pulseIntensity, lerpHex } from "../anim";
-import { useReveal } from "../useReveal";
 
 const ICON_COL = 4;
 const COL_WIDTH = 2;
@@ -15,11 +14,11 @@ function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RG
   for (let i = 0; i < str.length; i++) buf.setCell(x + i, y, str[i]!, fg, bg);
 }
 
-export function Git({ commits, width, height }: { commits: Commit[]; width: number; height: number }) {
+export function Git({ commits, width, height, progress }: { commits: Commit[]; width: number; height: number; progress: number }) {
   const total = commits.length;
-  const { revealed, animating } = useReveal(total, commits);
-
   if (total === 0) return <text fg={theme.dim}>not a git repo (or no commits)</text>;
+  const revealed = Math.max(1, Math.ceil(progress * total)); // synced to the Flow cursor
+  const animating = progress < 1;
 
   const graph = layoutGitGraph(commits.slice(0, revealed)); // lay out only revealed commits
   const dimWire = RGBA.fromHex(theme.wireDim);

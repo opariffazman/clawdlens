@@ -35,8 +35,8 @@ export function createPlayer(opts: PlayerOpts = {}) {
   function backlog(): number { return coalesced.length - head; }
 
   function interval(): number {
-    // replay plays at a steady cadence at the chosen base (no live min floor, no catch-up)
-    if (replay) return Math.max(1, base / speed);
+    // one adaptive cadence for live AND replay: faster when far behind, easing
+    // to base as it catches up / nears the end — the whole timeline is "like flow"
     const factor = 1 / (1 + Math.min(backlog(), 20) * 0.5);
     return Math.max(min, (base / speed) * factor);
   }
