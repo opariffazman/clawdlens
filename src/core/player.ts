@@ -1,0 +1,71 @@
+import type { Beat } from "./types";
+
+export interface PlayerOpts { baseIntervalMs?: number; minIntervalMs?: number }
+export type PlayMode = "live" | "paused" | "history";
+
+interface Coalesced extends Beat {}
+
+export function createPlayer(opts: PlayerOpts = {}) {
+  const base = opts.baseIntervalMs ?? 1000;
+  const min = opts.minIntervalMs ?? 120;
+
+  let coalesced: Coalesced[] = [];
+  let head = 0;             // number of coalesced beats presented (live head)
+  let cursor = 0;          // presentation cursor (== head in live mode)
+  let mode: PlayMode = "live";
+  let speed = 1;
+  let lastAdvanceAt = -1;
+  let started = false;
+
+  function rebuild(beats: Beat[]) {
+    const out: Coalesced[] = [];
+    for (const b of beats) {
+      const last = out[out.length - 1];
+      if (last && last.kind === b.kind && last.label === b.label && last.lane === b.lane) {
+        out[out.length - 1] = { ...last, count: last.count + b.count };
+      } else {
+        out.push({ ...b });
+      }
+    }
+    coalesced = out;
+    if (head > coalesced.length) head = coalesced.length;
+    if (mode === "live") cursor = head;
+  }
+
+  function backlog(): number { return coalesced.length - head; }
+
+  function interval(): number {
+    // more backlog -> shorter interval (adaptive catch-up)
+    const factor = 1 / (1 + Math.min(backlog(), 20) * 0.5);
+    return Math.max(min, (base / speed) * factor);
+  }
+
+  return {
+    setBeats(beats: Beat[]) { rebuild(beats); started = true; },
+    tick(now: number) {
+      if (!started || mode !== "live") return;
+      if (lastAdvanceAt < 0) lastAdvanceAt = now;
+      while (head < coalesced.length && now - lastAdvanceAt >= interval()) {
+        head += 1;
+        lastAdvanceAt += interval();
+      }
+      cursor = head;
+    },
+    presented(): Coalesced[] { return coalesced.slice(0, cursor); },
+    all(): Coalesced[] { return coalesced; },
+    backlog,
+    mode(): PlayMode { return mode; },
+    cursor(): number { return cursor; },
+    headIndex(): number { return head; },
+    setSpeed(mult: number) { speed = Math.max(0.25, Math.min(8, mult)); },
+    speed(): number { return speed; },
+    pause() { if (mode === "live") mode = "paused"; },
+    play() { if (mode === "paused") mode = "live"; },
+    stepBack() { mode = "history"; cursor = Math.max(0, cursor - 1); },
+    stepForward() { if (mode === "history") { cursor = Math.min(coalesced.length, cursor + 1); if (cursor >= head) toLiveInternal(); } },
+    toStart() { mode = "history"; cursor = 0; },
+    toLive() { toLiveInternal(); },
+  };
+
+  function toLiveInternal() { mode = "live"; cursor = head; }
+}
