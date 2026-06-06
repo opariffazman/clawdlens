@@ -4,12 +4,15 @@ export type Action =
   | { type: "beat-back" } | { type: "beat-fwd" } | { type: "chunk-back" } | { type: "chunk-fwd" }
   | { type: "to-start" } | { type: "to-live" } | { type: "pause" }
   | { type: "speed-up" } | { type: "speed-down" } | { type: "pulse" }
-  | { type: "lens" } | { type: "filter" } | { type: "rescan" } | { type: "help" } | { type: "quit" };
+  | { type: "lens" } | { type: "filter" } | { type: "rescan" } | { type: "help" } | { type: "quit" }
+  | { type: "replay" } | { type: "loop" };
 
 export interface KeyEvent { name: string; shift?: boolean; ctrl?: boolean }
 
 export function mapKey(key: KeyEvent): Action | null {
   const n = key.name;
+  if (n === "R" || (n === "r" && key.shift)) return { type: "replay" };
+  if (n === "L" || (n === "l" && key.shift)) return { type: "loop" };
   if (n === "j" || n === "down") return { type: "sess-down" };
   if (n === "k" || n === "up") return { type: "sess-up" };
   if (/^[1-9]$/.test(n)) return { type: "jump", n: parseInt(n, 10) };

@@ -7,6 +7,7 @@ import { usePlayers } from "./usePlayers";
 import { SessionList } from "./SessionList";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { theme } from "./theme";
+import { createPlayer } from "../core/player";
 
 type Store = ReturnType<typeof createStore>;
 
@@ -23,6 +24,7 @@ export function App({ store }: { store: Store }) {
   const [showHelp, setShowHelp] = useState(false);
   const [lensOn, setLensOn] = useState(true);
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
+  const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
 
   useEffect(() => {
     const unsub = store.subscribe(() => setSessions(store.sessions()));
@@ -36,9 +38,16 @@ export function App({ store }: { store: Store }) {
     return () => { renderer.off("resize", onResize); };
   }, [renderer]);
 
+  useEffect(() => {
+    if (!replay.player) return;
+    const id = setInterval(() => { replay.player!.tick(Date.now()); }, 100);
+    return () => clearInterval(id);
+  }, [replay.player]);
+
   const selected = sessions[Math.min(sel, Math.max(0, sessions.length - 1))] ?? null;
   const players = usePlayers(sessions, selected?.id ?? null);
   const player = selected ? players.get(selected.id) : null;
+  const activePlayer = replay.player ?? player;
 
   useKeyboard((key) => {
     const action = mapKey({ name: key.name, shift: key.shift, ctrl: key.ctrl });
@@ -63,6 +72,15 @@ export function App({ store }: { store: Store }) {
       case "lens": setLensOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
       case "rescan": store.pollOnce(Date.now()); break;
+      case "replay": {
+        if (replay.player) { setReplay({ player: null }); break; }
+        if (!selected) break;
+        const rp = createPlayer({ baseIntervalMs: 900, replay: true, loop: false });
+        rp.setBeats(store.fullBeats(selected.id));
+        setReplay({ player: rp });
+        break;
+      }
+      case "loop": replay.player?.setLoop(!replay.player.isLoop()); break;
     }
   });
 
@@ -70,6 +88,7 @@ export function App({ store }: { store: Store }) {
   const listWidth = Math.min(30, Math.floor(w * 0.28));
 
   const marker = (() => {
+    if (replay.player) return `⏮ replay ${replay.player.cursor()}/${replay.player.all().length}${replay.player.isLoop() ? " · ⟳" : ""}`;
     if (!player) return "";
     if (player.mode() === "history") return `⏪ ${player.cursor()}/${player.all().length}`;
     if (player.mode() === "paused") return "⏸ paused";
@@ -83,8 +102,8 @@ export function App({ store }: { store: Store }) {
       <Showcase
         session={selected}
         panel={panel}
-        presented={player ? player.presented() : []}
-        cursor={player ? player.cursor() : 0}
+        presented={activePlayer ? activePlayer.presented() : []}
+        cursor={activePlayer ? activePlayer.cursor() : 0}
         pulse={pulse}
         lensOn={lensOn}
         marker={marker}

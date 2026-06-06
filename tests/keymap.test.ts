@@ -26,3 +26,10 @@ test("timeline + playback keys", () => {
 test("unmapped returns null", () => {
   expect(a("z")).toBeNull();
 });
+
+test("replay and loop keys", () => {
+  expect(a("R")).toEqual({ type: "replay" });
+  expect(a("r", { shift: true })).toEqual({ type: "replay" });
+  expect(a("L")).toEqual({ type: "loop" });
+  expect(a("l", { shift: true })).toEqual({ type: "loop" });
+});

@@ -4,6 +4,7 @@ import { parseLine } from "../core/parse";
 import { newSession, applyEntry } from "../core/reducer";
 import { deriveStatus } from "../core/status";
 import { detectLens } from "../core/lens";
+import { loadBeats } from "../core/loadTranscript";
 import type { SessionState } from "../core/types";
 
 export interface StoreOpts { root?: string; pollMs?: number; backfillBytes?: number }
@@ -88,5 +89,9 @@ export function createStore(opts: StoreOpts = {}) {
       timer = setInterval(() => pollOnce(Date.now()), pollMs);
     },
     stop() { if (timer) { clearInterval(timer); timer = null; } },
+    fullBeats(id: string) {
+      const s = map.get(id);
+      return s ? loadBeats(s.file) : [];
+    },
   };
 }
