@@ -4,7 +4,7 @@ import { RGBA } from "@opentui/core";
 import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
-import { SessionList } from "./SessionList";
+import { SessionPicker, projectsOf, sessionsOf, type PickerState } from "./SessionPicker";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { theme } from "./theme";
 import { createPlayer } from "../core/player";
@@ -14,44 +14,39 @@ type Store = ReturnType<typeof createStore>;
 
 // transparent canvas → inherit the user's terminal background (OLED-friendly)
 const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0);
+const CLOSED: PickerState = { open: false, stage: "projects", project: null, index: 0 };
 
 export function App({ store }: { store: Store }) {
   const renderer = useRenderer();
   const [sessions, setSessions] = useState(store.sessions());
-  const [sel, setSel] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelId>("flow");
   const [pulse, setPulse] = useState(true);
-  const [blink, setBlink] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [lensOn, setLensOn] = useState(true);
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
   const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
   const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
   const [full, setFull] = useState<import("../core/types").SessionState | null>(null);
+  const [picker, setPicker] = useState<PickerState>(CLOSED);
 
-  useEffect(() => {
-    const unsub = store.subscribe(() => setSessions(store.sessions()));
-    return () => { unsub(); };
-  }, [store]);
+  useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
   useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
-  useEffect(() => { const id = setInterval(() => setBlink((b) => !b), 500); return () => clearInterval(id); }, []);
   useEffect(() => {
     const onResize = (cols: number, rows: number) => setSize({ w: cols, h: rows });
     renderer.on("resize", onResize);
     return () => { renderer.off("resize", onResize); };
   }, [renderer]);
-
   useEffect(() => {
     if (!replay.player) return;
     const id = setInterval(() => { replay.player!.tick(Date.now()); }, 100);
     return () => clearInterval(id);
   }, [replay.player]);
 
-  const selected = sessions[Math.min(sel, Math.max(0, sessions.length - 1))] ?? null;
+  const selected = sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null;
   const players = usePlayers(sessions, selected?.id ?? null);
 
-  // aggregate detail panels (files/tasks/git) read the FULL session, not just
-  // the live backfill window — so heat counts differ and tasks/cwd are complete
+  // aggregate detail panels (files/tasks/git) read the FULL session, not just the live window
   useEffect(() => {
     if (!selected) { setFull(null); setCommits([]); return; }
     if (panel === "files" || panel === "tasks" || panel === "git") {
@@ -62,20 +57,51 @@ export function App({ store }: { store: Store }) {
       setCommits([]);
     }
   }, [panel, selected?.id]);
+
   const player = selected ? players.get(selected.id) : null;
   const activePlayer = replay.player ?? player;
-  // one shared timeline: all panels reveal in sync with the Flow player's cursor
+  // one shared timeline: all panels reveal in sync with the active player's cursor
   const playerTotal = activePlayer ? activePlayer.all().length : 0;
   const progress = activePlayer && playerTotal > 0 ? activePlayer.cursor() / playerTotal : 1;
 
+  const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
+  const stepSel = (dir: number) => {
+    const i = sessions.findIndex((s) => s.id === selected?.id);
+    switchTo(sessions[Math.max(0, Math.min(sessions.length - 1, (i < 0 ? 0 : i) + dir))]?.id ?? null);
+  };
+
   useKeyboard((key) => {
+    const kn = key.name;
+    if (picker.open) {
+      const len = picker.stage === "projects"
+        ? projectsOf(sessions).length
+        : (picker.project ? sessionsOf(sessions, picker.project).length : 0);
+      if (kn === "escape" || kn === ":") {
+        setPicker(kn === "escape" && picker.stage === "sessions" ? { open: true, stage: "projects", project: null, index: 0 } : CLOSED);
+      } else if (kn === "j" || kn === "down") {
+        setPicker((p) => ({ ...p, index: Math.min(Math.max(0, len - 1), p.index + 1) }));
+      } else if (kn === "k" || kn === "up") {
+        setPicker((p) => ({ ...p, index: Math.max(0, p.index - 1) }));
+      } else if (kn === "return" || kn === "enter") {
+        if (picker.stage === "projects") {
+          const proj = projectsOf(sessions)[Math.min(picker.index, len - 1)]?.project ?? null;
+          if (proj) setPicker({ open: true, stage: "sessions", project: proj, index: 0 });
+        } else {
+          const s = (picker.project ? sessionsOf(sessions, picker.project) : [])[Math.min(picker.index, len - 1)];
+          if (s) switchTo(s.id);
+          setPicker(CLOSED);
+        }
+      }
+      return;
+    }
+    if (kn === ":") { setPicker({ open: true, stage: "projects", project: null, index: 0 }); return; }
     const action = mapKey({ name: key.name, shift: key.shift, ctrl: key.ctrl });
     if (!action) return;
     switch (action.type) {
       case "quit": renderer.destroy(); break;
-      case "sess-down": setReplay({ player: null }); setSel((i) => Math.min(sessions.length - 1, i + 1)); break;
-      case "sess-up": setReplay({ player: null }); setSel((i) => Math.max(0, i - 1)); break;
-      case "jump": setReplay({ player: null }); setSel(Math.min(sessions.length - 1, action.n - 1)); break;
+      case "sess-down": stepSel(1); break;
+      case "sess-up": stepSel(-1); break;
+      case "jump": switchTo(sessions[Math.min(sessions.length - 1, action.n - 1)]?.id ?? null); break;
       case "panel-next": setPanel((p) => PANELS[(PANELS.indexOf(p) + 1) % PANELS.length]!); break;
       case "panel-prev": setPanel((p) => PANELS[(PANELS.indexOf(p) + PANELS.length - 1) % PANELS.length]!); break;
       case "beat-back": activePlayer?.stepBack(); break;
@@ -90,7 +116,13 @@ export function App({ store }: { store: Store }) {
       case "pulse": setPulse((p) => !p); break;
       case "lens": setLensOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
-      case "rescan": store.pollOnce(Date.now()); if (selected && (panel === "files" || panel === "tasks" || panel === "git")) { const fs = store.fullSession(selected.id); setFull(fs); if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd) : []); } break;
+      case "rescan":
+        store.pollOnce(Date.now());
+        if (selected && (panel === "files" || panel === "tasks" || panel === "git")) {
+          const fs = store.fullSession(selected.id); setFull(fs);
+          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd) : []);
+        }
+        break;
       case "replay": {
         if (replay.player) { setReplay({ player: null }); break; }
         if (!selected) break;
@@ -104,7 +136,6 @@ export function App({ store }: { store: Store }) {
   });
 
   const { w, h } = size;
-  const listWidth = Math.min(30, Math.floor(w * 0.28));
 
   const marker = (() => {
     const sp = activePlayer ? activePlayer.speed() : 1;
@@ -119,8 +150,7 @@ export function App({ store }: { store: Store }) {
   })();
 
   return (
-    <box style={{ flexDirection: "row", width: w, height: h, backgroundColor: TRANSPARENT }}>
-      <SessionList sessions={sessions} selectedIndex={sel} blink={blink} width={listWidth} height={h} />
+    <box style={{ width: w, height: h, backgroundColor: TRANSPARENT }}>
       <Showcase
         session={selected}
         panel={panel}
@@ -129,17 +159,17 @@ export function App({ store }: { store: Store }) {
         pulse={pulse}
         lensOn={lensOn}
         marker={marker}
-        width={w - listWidth}
+        width={w}
         height={h}
         commits={commits}
         full={full}
         progress={progress}
       />
+      {picker.open && <SessionPicker sessions={sessions} picker={picker} width={Math.min(54, w - 4)} height={h - 2} />}
       {showHelp && (
         <box style={{ position: "absolute", border: true, padding: 1, backgroundColor: theme.panel }} title="keys">
-          <text fg={theme.fg}>j/k sessions · Tab panels · h/l scrub · g/G start/live · space pause</text>
-          <text fg={theme.fg}>+/- speed · p pulse · w lens · r rescan · q quit</text>
-          <text fg={theme.fg}>R replay · L loop</text>
+          <text fg={theme.fg}>: sessions · Tab panels · h/l scrub · g/G start/live · space pause</text>
+          <text fg={theme.fg}>+/- speed · p pulse · w lens · R replay · L loop · r rescan · q quit</text>
         </box>
       )}
     </box>
