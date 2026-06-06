@@ -1,5 +1,5 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
-import { layoutFlow } from "../../core/flow-layout";
+import { layoutFlow, ROW_STRIDE } from "../../core/flow-layout";
 import type { Beat } from "../../core/types";
 import { theme } from "../theme";
 import { pulseIntensity, lerpHex } from "../anim";
@@ -27,7 +27,7 @@ export function Flow({ beats, cursor, pulse, width, height }: Props) {
 
   // viewport: center on the cursor, clamped so we never scroll past the ends.
   const total = graph.rows;
-  const top = Math.max(0, Math.min(Math.max(0, total - height), cursor - Math.floor(height / 2)));
+  const top = Math.max(0, Math.min(Math.max(0, total - height), cursor * ROW_STRIDE - Math.floor(height / 2)));
 
   return (
     <box
@@ -61,7 +61,7 @@ export function Flow({ beats, cursor, pulse, width, height }: Props) {
 
         // nodes (icon + label) — cursor row highlighted
         for (const node of graph.nodes) {
-          const y = node.row - top;
+          const y = node.row * ROW_STRIDE - top;
           if (y < 0 || y >= height) continue;
           const b = beats[node.row];
           if (!b) continue;

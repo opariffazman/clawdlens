@@ -13,6 +13,18 @@ test("main-lane beats stack in column 0 on increasing rows", () => {
   expect(g.lanes.find(l => l.id === "main")?.column).toBe(0);
 });
 
+test("consecutive same-lane nodes are joined by visible spine wires", () => {
+  const g = layoutFlow([beat({ id: "a" }), beat({ id: "b" }), beat({ id: "c" })]);
+  const cells = g.segments.flatMap((s) => s.cells);
+  // there must be drawable connector cells between the stacked nodes
+  expect(cells.length).toBeGreaterThan(0);
+  expect(cells.some((c) => c.ch === "│")).toBe(true);
+  // wires sit in the main lane column (x = 0), between node display-rows
+  expect(cells.every((c) => c.x === 0)).toBe(true);
+  // display height leaves a gap row between each node (stride > 1)
+  expect(g.rows).toBeGreaterThan(g.nodes.length);
+});
+
 test("subagent lane gets its own column and a branch segment", () => {
   const g = layoutFlow([
     beat({ id: "task", lane: "main", label: "Task" }),
