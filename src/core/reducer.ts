@@ -9,6 +9,33 @@ function basename(p: string): string {
   return parts[parts.length - 1] || p;
 }
 
+export const TOOL_ICONS: Record<string, string> = {
+  Bash: "⚙", Edit: "✎", Write: "✎", Read: "",
+  Grep: "", Glob: "", WebSearch: "", WebFetch: "",
+  Task: "\u{1f916}", Skill: "\u{1f3af}", TodoWrite: "☑", default: "◈",
+};
+function toolIcon(name: string): string { return TOOL_ICONS[name] ?? TOOL_ICONS.default!; }
+
+function fileOf(input: Record<string, unknown> | undefined): string | undefined {
+  const p = input?.file_path ?? input?.path ?? input?.notebook_path;
+  return typeof p === "string" ? basename(p) : undefined;
+}
+
+function nextBeatId(s: SessionState): string { s.beatSeq += 1; return `${s.id}:${s.beatSeq}`; }
+
+function pushBeat(s: SessionState, b: Omit<import("./types").Beat, "id" | "count">): void {
+  s.beats = [...s.beats, { ...b, id: nextBeatId(s), count: 1 }];
+}
+
+function laneFor(e: Entry, s: SessionState): string {
+  if (e.isSidechain) {
+    const link = e.sourceToolUseID;
+    if (link && s.openLanes.includes(link)) return link;
+    return s.openLanes[s.openLanes.length - 1] ?? "main";
+  }
+  return "main";
+}
+
 export function newSession(id: string, file: string): SessionState {
   return {
     id, file,
@@ -92,8 +119,32 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
     s.tokens.webCalls += (usage.server_tool_use?.web_search_requests ?? 0) + (usage.server_tool_use?.web_fetch_requests ?? 0);
     s.costUSD = estimateCostUSD(t, s.model);
   }
-  // content blocks handled in Task 7
-  void ts;
+
+  const lane = laneFor(e, s);
+  const blocks = Array.isArray(m.content) ? m.content : [];
+  for (const b of blocks as ContentBlock[]) {
+    if (b.type === "thinking") {
+      pushBeat(s, { ts, kind: "thinking", icon: "◇", label: "thinking", lane, skill: e.attributionSkill });
+      s.lastBlockKind = "thinking";
+    } else if (b.type === "text") {
+      const text = (b.text ?? "").trim();
+      if (text) { pushBeat(s, { ts, kind: "text", icon: "○", label: "says", detail: text.slice(0, 80), lane, skill: e.attributionSkill }); s.lastBlockKind = "text"; }
+    } else if (b.type === "tool_use") {
+      const name = b.name ?? "Tool";
+      s.toolStats[name] = (s.toolStats[name] ?? 0) + 1;
+      if (name === "Skill") {
+        const skill = String(b.input?.skill ?? "skill");
+        pushBeat(s, { ts, kind: "skill", icon: TOOL_ICONS.Skill!, label: skill, lane, toolUseId: b.id, skill });
+      } else {
+        const detail = name === "Bash"
+          ? (typeof b.input?.description === "string" ? b.input.description as string : (typeof b.input?.command === "string" ? (b.input.command as string).slice(0, 60) : undefined))
+          : fileOf(b.input) ?? (typeof b.input?.query === "string" ? (b.input.query as string).slice(0, 60) : undefined);
+        pushBeat(s, { ts, kind: "tool", icon: toolIcon(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill });
+        if (b.id) s.pendingTools[b.id] = s.beats[s.beats.length - 1]!.id;
+      }
+      s.lastBlockKind = "tool_use";
+    }
+  }
 }
 
 function foldUser(s: SessionState, e: Entry, ts: number) {
