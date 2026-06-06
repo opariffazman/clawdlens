@@ -7,11 +7,13 @@ import { Flow } from "./panels/Flow";
 import { Log } from "./panels/Log";
 import { Files } from "./panels/Files";
 import { Todos } from "./panels/Todos";
+import { Git } from "./panels/Git";
 import type { Beat } from "../core/types";
+import type { Commit } from "../core/types";
 import { usePowerline, POWERLINE_RIGHT } from "./icons";
 
-export type PanelId = "flow" | "files" | "todos" | "log";
-export const PANELS: PanelId[] = ["flow", "files", "todos", "log"];
+export type PanelId = "flow" | "files" | "todos" | "log" | "git";
+export const PANELS: PanelId[] = ["flow", "files", "todos", "log", "git"];
 
 interface Props {
   session: SessionState | null;
@@ -23,9 +25,10 @@ interface Props {
   marker: string;
   width: number;
   height: number;
+  commits: Commit[];
 }
 
-export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height }: Props) {
+export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height, commits }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -60,6 +63,7 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
         {panel === "log" && <Log beats={presented} height={bodyHeight} />}
         {panel === "files" && <Files heat={session.fileHeat} height={bodyHeight} />}
         {panel === "todos" && <Todos todos={session.todos} height={bodyHeight} />}
+        {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} />}
       </box>
       {/* fixed footer */}
       <box style={{ flexShrink: 0 }}>

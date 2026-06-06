@@ -8,6 +8,7 @@ import { SessionList } from "./SessionList";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { theme } from "./theme";
 import { createPlayer } from "../core/player";
+import { gitLog } from "../store/gitFetch";
 
 type Store = ReturnType<typeof createStore>;
 
@@ -25,6 +26,7 @@ export function App({ store }: { store: Store }) {
   const [lensOn, setLensOn] = useState(true);
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
   const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
+  const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
 
   useEffect(() => {
     const unsub = store.subscribe(() => setSessions(store.sessions()));
@@ -46,6 +48,11 @@ export function App({ store }: { store: Store }) {
 
   const selected = sessions[Math.min(sel, Math.max(0, sessions.length - 1))] ?? null;
   const players = usePlayers(sessions, selected?.id ?? null);
+
+  useEffect(() => {
+    if (panel === "git" && selected?.cwd) setCommits(gitLog(selected.cwd));
+    else if (panel !== "git") setCommits([]);
+  }, [panel, selected?.id, selected?.cwd]);
   const player = selected ? players.get(selected.id) : null;
   const activePlayer = replay.player ?? player;
 
@@ -71,7 +78,7 @@ export function App({ store }: { store: Store }) {
       case "pulse": setPulse((p) => !p); break;
       case "lens": setLensOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
-      case "rescan": store.pollOnce(Date.now()); break;
+      case "rescan": store.pollOnce(Date.now()); if (panel === "git" && selected?.cwd) setCommits(gitLog(selected.cwd)); break;
       case "replay": {
         if (replay.player) { setReplay({ player: null }); break; }
         if (!selected) break;
@@ -109,6 +116,7 @@ export function App({ store }: { store: Store }) {
         marker={marker}
         width={w - listWidth}
         height={h}
+        commits={commits}
       />
       {showHelp && (
         <box style={{ position: "absolute", border: true, padding: 1, backgroundColor: theme.panel }} title="keys">
