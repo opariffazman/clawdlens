@@ -54,9 +54,9 @@ export function App({ store }: { store: Store }) {
     if (!action) return;
     switch (action.type) {
       case "quit": renderer.destroy(); break;
-      case "sess-down": setSel((i) => Math.min(sessions.length - 1, i + 1)); break;
-      case "sess-up": setSel((i) => Math.max(0, i - 1)); break;
-      case "jump": setSel(Math.min(sessions.length - 1, action.n - 1)); break;
+      case "sess-down": setReplay({ player: null }); setSel((i) => Math.min(sessions.length - 1, i + 1)); break;
+      case "sess-up": setReplay({ player: null }); setSel((i) => Math.max(0, i - 1)); break;
+      case "jump": setReplay({ player: null }); setSel(Math.min(sessions.length - 1, action.n - 1)); break;
       case "panel-next": setPanel((p) => PANELS[(PANELS.indexOf(p) + 1) % PANELS.length]!); break;
       case "panel-prev": setPanel((p) => PANELS[(PANELS.indexOf(p) + PANELS.length - 1) % PANELS.length]!); break;
       case "beat-back": player?.stepBack(); break;
@@ -80,7 +80,7 @@ export function App({ store }: { store: Store }) {
         setReplay({ player: rp });
         break;
       }
-      case "loop": replay.player?.setLoop(!replay.player.isLoop()); break;
+      case "loop": if (replay.player) { replay.player.setLoop(!replay.player.isLoop()); setReplay({ player: replay.player }); } break;
     }
   });
 
@@ -114,6 +114,7 @@ export function App({ store }: { store: Store }) {
         <box style={{ position: "absolute", border: true, padding: 1, backgroundColor: theme.panel }} title="keys">
           <text fg={theme.fg}>j/k sessions · Tab panels · h/l scrub · g/G start/live · space pause</text>
           <text fg={theme.fg}>+/- speed · p pulse · w lens · r rescan · q quit</text>
+          <text fg={theme.fg}>R replay · L loop</text>
         </box>
       )}
     </box>
