@@ -75,7 +75,7 @@ export function App({ store }: { store: Store }) {
 
   return (
     <box style={{ flexDirection: "row", width: w, height: h, backgroundColor: theme.bg }}>
-      <SessionList sessions={sessions} selectedIndex={sel} blink={blink} width={listWidth} />
+      <SessionList sessions={sessions} selectedIndex={sel} blink={blink} width={listWidth} height={h} />
       <Showcase
         session={selected}
         panel={panel}

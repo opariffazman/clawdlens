@@ -32,24 +32,32 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
       </box>
     );
   }
-  const bodyHeight = height - 6;
+  // height budget: border(2) + padding(2) + header cluster(≤4) + body marginTop(1) + statusbar(1)
+  const bodyHeight = Math.max(1, height - 10);
   return (
     <box style={{ flexGrow: 1, border: true, flexDirection: "column", padding: 1 }}>
-      <PhaseRibbon lens={lensOn ? session.lens : { ...session.lens, lensId: null }} />
-      <text fg={theme.fg}>{`● ${session.project} · ${session.gitBranch || "?"} · ${session.model}`}</text>
-      <text fg={theme.dim}>{truncate(session.title || session.lastPrompt, width - 6)}</text>
-      <box style={{ flexDirection: "row", gap: 1 }}>
-        {PANELS.map((p) => (
-          <text key={p} fg={p === panel ? theme.accent : theme.dim}>{p === panel ? `[${p}]` : ` ${p} `}</text>
-        ))}
+      {/* fixed header cluster — never shrinks, so each line keeps its own row */}
+      <box style={{ flexShrink: 0, flexDirection: "column" }}>
+        <PhaseRibbon lens={lensOn ? session.lens : { ...session.lens, lensId: null }} />
+        <text fg={theme.fg}>{`● ${session.project} · ${session.gitBranch || "?"} · ${session.model}`}</text>
+        <text fg={theme.dim}>{truncate(session.title || session.lastPrompt, width - 6)}</text>
+        <box style={{ flexDirection: "row", gap: 1 }}>
+          {PANELS.map((p) => (
+            <text key={p} fg={p === panel ? theme.accent : theme.dim}>{p === panel ? `[${p}]` : ` ${p} `}</text>
+          ))}
+        </box>
       </box>
-      <box style={{ flexGrow: 1, marginTop: 1 }}>
+      {/* body — absorbs the slack */}
+      <box style={{ flexGrow: 1, flexShrink: 1, marginTop: 1 }}>
         {panel === "flow" && <Flow beats={presented} cursor={cursor} pulse={pulse} width={width - 4} height={bodyHeight} />}
         {panel === "log" && <Log beats={presented} height={bodyHeight} />}
         {panel === "files" && <Files heat={session.fileHeat} height={bodyHeight} />}
         {panel === "todos" && <Todos todos={session.todos} height={bodyHeight} />}
       </box>
-      <StatusBar session={session} marker={marker} elapsedMs={Math.max(0, session.lastActivityTs - session.startedTs)} />
+      {/* fixed footer */}
+      <box style={{ flexShrink: 0 }}>
+        <StatusBar session={session} marker={marker} elapsedMs={Math.max(0, session.lastActivityTs - session.startedTs)} />
+      </box>
     </box>
   );
 }
