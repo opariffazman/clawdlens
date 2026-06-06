@@ -72,3 +72,48 @@ test("Edit tool_use records file detail", () => {
   ]);
   expect(s.beats[0]!.detail).toBe("auth.ts");
 });
+
+test("tool_result pairs with its tool beat and sets ok/error", () => {
+  const s = feed([
+    { type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "Bash", input: { description: "x" } }] } },
+    { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", is_error: true }] } },
+  ]);
+  const bash = s.beats.find(b => b.toolUseId === "t1")!;
+  expect(bash.ok).toBe(false);
+  expect(s.lastErrored).toBe(true);
+  expect(s.pendingTools.t1).toBeUndefined();
+});
+
+test("Edit/Write increment file heat edits; Read increments reads", () => {
+  const s = feed([
+    { type: "assistant", message: { content: [
+      { type: "tool_use", id: "e1", name: "Edit", input: { file_path: "/r/a.ts" } },
+      { type: "tool_use", id: "r1", name: "Read", input: { file_path: "/r/a.ts" } },
+    ] } },
+  ]);
+  expect(s.fileHeat["a.ts"]!.edits).toBe(1);
+  expect(s.fileHeat["a.ts"]!.reads).toBe(1);
+});
+
+test("TodoWrite updates todos", () => {
+  const s = feed([
+    { type: "assistant", message: { content: [
+      { type: "tool_use", id: "td", name: "TodoWrite", input: { todos: [
+        { content: "do a", status: "completed" }, { content: "do b", status: "in_progress" },
+      ] } },
+    ] } },
+  ]);
+  expect(s.todos?.length).toBe(2);
+  expect(s.todos?.[1]!.status).toBe("in_progress");
+});
+
+test("Task opens a subagent lane; its result closes it; sidechain beats land in the lane", () => {
+  const s = feed([
+    { type: "assistant", message: { content: [{ type: "tool_use", id: "T1", name: "Task", input: { subagent_type: "code-reviewer", description: "review" } }] } },
+    { type: "assistant", isSidechain: true, sourceToolUseID: "T1", message: { content: [{ type: "tool_use", id: "g1", name: "Grep", input: { query: "useEffect" } }] } },
+    { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "T1" }] } },
+  ]);
+  const grep = s.beats.find(b => b.label === "Grep")!;
+  expect(grep.lane).toBe("T1");
+  expect(s.openLanes).toEqual([]); // closed after result
+});

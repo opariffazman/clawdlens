@@ -36,6 +36,21 @@ function laneFor(e: Entry, s: SessionState): string {
   return "main";
 }
 
+function bumpHeat(s: SessionState, name: string, input: Record<string, unknown> | undefined, ts: number): void {
+  const f = fileOf(input);
+  if (!f) return;
+  const cur = s.fileHeat[f] ?? { reads: 0, edits: 0, lastTs: 0 };
+  const isEdit = name === "Edit" || name === "Write" || name === "NotebookEdit";
+  s.fileHeat = { ...s.fileHeat, [f]: { reads: cur.reads + (isEdit ? 0 : 1), edits: cur.edits + (isEdit ? 1 : 0), lastTs: ts } };
+}
+
+function foldTodos(s: SessionState, input: Record<string, unknown> | undefined): void {
+  const todos = input?.todos;
+  if (Array.isArray(todos)) {
+    s.todos = todos.map((t: any) => ({ content: String(t.content ?? ""), status: t.status ?? "pending" }));
+  }
+}
+
 export function newSession(id: string, file: string): SessionState {
   return {
     id, file,
@@ -102,6 +117,7 @@ export function applyEntry(prev: SessionState, e: Entry, now: number): SessionSt
 }
 
 function foldAssistant(s: SessionState, e: Entry, ts: number) {
+  s.lastErrored = false;
   const m = e.message;
   if (!m) return;
   if (m.model) s.model = m.model;
@@ -135,19 +151,39 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
       if (name === "Skill") {
         const skill = String(b.input?.skill ?? "skill");
         pushBeat(s, { ts, kind: "skill", icon: TOOL_ICONS.Skill!, label: skill, lane, toolUseId: b.id, skill });
+      } else if (name === "Task") {
+        const sub = String(b.input?.subagent_type ?? b.input?.description ?? "subagent");
+        pushBeat(s, { ts, kind: "tool", icon: TOOL_ICONS.Task!, label: `Task · ${sub}`, lane, toolUseId: b.id, skill: e.attributionSkill });
+        if (b.id) { s.openLanes = [...s.openLanes, b.id]; s.pendingTools[b.id] = s.beats[s.beats.length - 1]!.id; }
       } else {
         const detail = name === "Bash"
           ? (typeof b.input?.description === "string" ? b.input.description as string : (typeof b.input?.command === "string" ? (b.input.command as string).slice(0, 60) : undefined))
           : fileOf(b.input) ?? (typeof b.input?.query === "string" ? (b.input.query as string).slice(0, 60) : undefined);
         pushBeat(s, { ts, kind: "tool", icon: toolIcon(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill });
         if (b.id) s.pendingTools[b.id] = s.beats[s.beats.length - 1]!.id;
+        bumpHeat(s, name, b.input, ts);
       }
       s.lastBlockKind = "tool_use";
+      if (name === "TodoWrite") foldTodos(s, b.input);
     }
   }
 }
 
 function foldUser(s: SessionState, e: Entry, ts: number) {
-  // tool results handled in Task 8
-  void s; void e; void ts;
+  const blocks = Array.isArray(e.message?.content) ? e.message!.content as ContentBlock[] : [];
+  let errored = false;
+  for (const b of blocks) {
+    if (b.type !== "tool_result") continue;
+    const id = b.tool_use_id;
+    if (!id) continue;
+    const beatId = s.pendingTools[id];
+    if (beatId) {
+      s.beats = s.beats.map(bt => bt.id === beatId ? { ...bt, ok: !b.is_error } : bt);
+      const np = { ...s.pendingTools }; delete np[id]; s.pendingTools = np;
+    }
+    if (s.openLanes.includes(id)) s.openLanes = s.openLanes.filter(l => l !== id);
+    if (b.is_error) errored = true;
+  }
+  s.lastErrored = errored;
+  void ts;
 }
