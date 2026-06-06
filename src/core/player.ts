@@ -3,13 +3,11 @@ import type { Beat } from "./types";
 export interface PlayerOpts { baseIntervalMs?: number; minIntervalMs?: number }
 export type PlayMode = "live" | "paused" | "history";
 
-interface Coalesced extends Beat {}
-
 export function createPlayer(opts: PlayerOpts = {}) {
   const base = opts.baseIntervalMs ?? 1000;
   const min = opts.minIntervalMs ?? 120;
 
-  let coalesced: Coalesced[] = [];
+  let coalesced: Beat[] = [];
   let head = 0;             // number of coalesced beats presented (live head)
   let cursor = 0;          // presentation cursor (== head in live mode)
   let mode: PlayMode = "live";
@@ -18,7 +16,7 @@ export function createPlayer(opts: PlayerOpts = {}) {
   let started = false;
 
   function rebuild(beats: Beat[]) {
-    const out: Coalesced[] = [];
+    const out: Beat[] = [];
     for (const b of beats) {
       const last = out[out.length - 1];
       if (last && last.kind === b.kind && last.label === b.label && last.lane === b.lane) {
@@ -51,8 +49,8 @@ export function createPlayer(opts: PlayerOpts = {}) {
       }
       cursor = head;
     },
-    presented(): Coalesced[] { return coalesced.slice(0, cursor); },
-    all(): Coalesced[] { return coalesced; },
+    presented(): Beat[] { return coalesced.slice(0, cursor); },
+    all(): Beat[] { return coalesced; },
     backlog,
     mode(): PlayMode { return mode; },
     cursor(): number { return cursor; },

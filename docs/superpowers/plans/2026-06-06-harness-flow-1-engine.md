@@ -1293,22 +1293,22 @@ import type { Beat } from "./types";
 export interface PlayerOpts { baseIntervalMs?: number; minIntervalMs?: number }
 export type PlayMode = "live" | "paused" | "history";
 
-interface Coalesced extends Beat {}
+// Note: the Coalesced alias was removed; Beat[] is used directly.
 
 export function createPlayer(opts: PlayerOpts = {}) {
   const base = opts.baseIntervalMs ?? 1000;
   const min = opts.minIntervalMs ?? 120;
 
-  let coalesced: Coalesced[] = [];
+  let coalesced: Beat[] = [];
   let head = 0;             // number of coalesced beats presented (live head)
   let cursor = 0;          // presentation cursor (== head in live mode)
   let mode: PlayMode = "live";
   let speed = 1;
-  let lastAdvanceAt = 0;
+  let lastAdvanceAt = -1;
   let started = false;
 
   function rebuild(beats: Beat[]) {
-    const out: Coalesced[] = [];
+    const out: Beat[] = [];
     for (const b of beats) {
       const last = out[out.length - 1];
       if (last && last.kind === b.kind && last.label === b.label && last.lane === b.lane) {
@@ -1334,15 +1334,15 @@ export function createPlayer(opts: PlayerOpts = {}) {
     setBeats(beats: Beat[]) { rebuild(beats); started = true; },
     tick(now: number) {
       if (!started || mode !== "live") return;
-      if (lastAdvanceAt === 0) lastAdvanceAt = now;
+      if (lastAdvanceAt < 0) lastAdvanceAt = now;
       while (head < coalesced.length && now - lastAdvanceAt >= interval()) {
         head += 1;
         lastAdvanceAt += interval();
       }
       cursor = head;
     },
-    presented(): Coalesced[] { return coalesced.slice(0, cursor); },
-    all(): Coalesced[] { return coalesced; },
+    presented(): Beat[] { return coalesced.slice(0, cursor); },
+    all(): Beat[] { return coalesced; },
     backlog,
     mode(): PlayMode { return mode; },
     cursor(): number { return cursor; },
@@ -1515,21 +1515,30 @@ Expected: FAIL — module not found.
 ```ts
 import { openSync, readSync, closeSync, statSync } from "node:fs";
 
-interface FileState { offset: number; carry: string }
+interface FileState { offset: number; carry: string; seededMid: boolean }
 
 export function createTailer() {
   const states = new Map<string, FileState>();
 
-  function read(file: string, opts: { startAtEof?: boolean } = {}): string[] {
+  function read(file: string, opts: { startAtEof?: boolean; tailBytes?: number } = {}): string[] {
     let size = 0;
     try { size = statSync(file).size; } catch { return []; }
 
     let st = states.get(file);
     if (!st) {
-      st = { offset: opts.startAtEof ? size : 0, carry: "" };
+      let offset: number;
+      let seededMid = false;
+      if (opts.tailBytes !== undefined) {
+        const start = Math.max(0, size - opts.tailBytes);
+        offset = start;
+        seededMid = start > 0;
+      } else {
+        offset = opts.startAtEof ? size : 0;
+      }
+      st = { offset, carry: "", seededMid };
       states.set(file, st);
     }
-    if (size < st.offset) { st.offset = 0; st.carry = ""; } // truncated/rotated
+    if (size < st.offset) { st.offset = 0; st.carry = ""; st.seededMid = false; } // truncated/rotated
     if (size === st.offset) return [];
 
     const len = size - st.offset;
@@ -1541,12 +1550,20 @@ export function createTailer() {
     const text = st.carry + buf.toString("utf8");
     const parts = text.split("\n");
     st.carry = parts.pop() ?? ""; // last element is incomplete (no trailing newline) or ""
-    return parts.filter(l => l.length > 0);
+    const lines = parts.filter(l => l.length > 0);
+
+    if (st.seededMid) {
+      st.seededMid = false;
+      return lines.slice(1); // drop the mid-line partial fragment
+    }
+    return lines;
   }
 
   return { read, forget(file: string) { states.delete(file); } };
 }
 ```
+
+> Byte math note: `tailBytes` seeds `offset = max(0, size - tailBytes)`. When `offset > 0`, the first bytes read start mid-line; `seededMid` is set true so that first element (the partial fragment) is dropped after the `filter`. Truncation reset also clears `seededMid`.
 
 - [ ] **Step 4: Run to verify pass**
 
@@ -1624,12 +1641,13 @@ import { deriveStatus } from "../core/status";
 import { detectLens } from "../core/lens";
 import type { SessionState } from "../core/types";
 
-export interface StoreOpts { root?: string; pollMs?: number; seenAtStart?: boolean }
+export interface StoreOpts { root?: string; pollMs?: number; backfillBytes?: number }
 type Listener = () => void;
 
 export function createStore(opts: StoreOpts = {}) {
   const root = opts.root ?? projectsRoot();
   const pollMs = opts.pollMs ?? 750;
+  const BACKFILL_BYTES = opts.backfillBytes ?? 65536;
   const tailer = createTailer();
   const map = new Map<string, SessionState>();
   const firstRead = new Set<string>();
@@ -1642,11 +1660,21 @@ export function createStore(opts: StoreOpts = {}) {
     const found = discoverSessions(root);
     let changed = false;
     for (const fs of found) {
-      const startAtEof = !firstRead.has(fs.file);
-      const lines = tailer.read(fs.file, { startAtEof });
+      const isFirst = !firstRead.has(fs.file);
+      const lines = isFirst
+        ? tailer.read(fs.file, { tailBytes: BACKFILL_BYTES })
+        : tailer.read(fs.file, {});
       firstRead.add(fs.file);
       if (!map.has(fs.id)) map.set(fs.id, newSession(fs.id, fs.file));
-      if (lines.length === 0) continue;
+      if (lines.length === 0) {
+        // Ensure newly discovered empty sessions get recomputed (for idle guard)
+        if (isFirst) {
+          const s = recompute(map.get(fs.id)!, now);
+          map.set(fs.id, s);
+          changed = true;
+        }
+        continue;
+      }
       let s = map.get(fs.id)!;
       for (const raw of lines) {
         const entry = parseLine(raw);
@@ -1666,6 +1694,11 @@ export function createStore(opts: StoreOpts = {}) {
   }
 
   function recompute(s: SessionState, now: number): SessionState {
+    const lens = detectLens(s);
+    // Zero-activity guard: a discovered session with no folded entries is idle
+    if (s.lastActivityTs === 0 && s.lastEntryType === "") {
+      return { ...s, status: "idle", lens };
+    }
     const status = deriveStatus({
       lastEntryType: s.lastEntryType,
       lastStopReason: s.lastStopReason,
@@ -1674,7 +1707,6 @@ export function createStore(opts: StoreOpts = {}) {
       lastErrored: s.lastErrored,
       ageMs: s.lastActivityTs ? now - s.lastActivityTs : 0,
     });
-    const lens = detectLens(s);
     return { ...s, status, lens };
   }
 

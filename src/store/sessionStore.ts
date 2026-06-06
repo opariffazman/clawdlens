@@ -6,12 +6,13 @@ import { deriveStatus } from "../core/status";
 import { detectLens } from "../core/lens";
 import type { SessionState } from "../core/types";
 
-export interface StoreOpts { root?: string; pollMs?: number; seenAtStart?: boolean }
+export interface StoreOpts { root?: string; pollMs?: number; backfillBytes?: number }
 type Listener = () => void;
 
 export function createStore(opts: StoreOpts = {}) {
   const root = opts.root ?? projectsRoot();
   const pollMs = opts.pollMs ?? 750;
+  const BACKFILL_BYTES = opts.backfillBytes ?? 65536;
   const tailer = createTailer();
   const map = new Map<string, SessionState>();
   const firstRead = new Set<string>();
@@ -24,11 +25,21 @@ export function createStore(opts: StoreOpts = {}) {
     const found = discoverSessions(root);
     let changed = false;
     for (const fs of found) {
-      const startAtEof = !firstRead.has(fs.file);
-      const lines = tailer.read(fs.file, { startAtEof });
+      const isFirst = !firstRead.has(fs.file);
+      const lines = isFirst
+        ? tailer.read(fs.file, { tailBytes: BACKFILL_BYTES })
+        : tailer.read(fs.file, {});
       firstRead.add(fs.file);
       if (!map.has(fs.id)) map.set(fs.id, newSession(fs.id, fs.file));
-      if (lines.length === 0) continue;
+      if (lines.length === 0) {
+        // Ensure newly discovered empty sessions get recomputed (for idle guard)
+        if (isFirst) {
+          const s = recompute(map.get(fs.id)!, now);
+          map.set(fs.id, s);
+          changed = true;
+        }
+        continue;
+      }
       let s = map.get(fs.id)!;
       for (const raw of lines) {
         const entry = parseLine(raw);
@@ -48,6 +59,11 @@ export function createStore(opts: StoreOpts = {}) {
   }
 
   function recompute(s: SessionState, now: number): SessionState {
+    const lens = detectLens(s);
+    // Zero-activity guard: a discovered session with no folded entries is idle
+    if (s.lastActivityTs === 0 && s.lastEntryType === "") {
+      return { ...s, status: "idle", lens };
+    }
     const status = deriveStatus({
       lastEntryType: s.lastEntryType,
       lastStopReason: s.lastStopReason,
@@ -56,7 +72,6 @@ export function createStore(opts: StoreOpts = {}) {
       lastErrored: s.lastErrored,
       ageMs: s.lastActivityTs ? now - s.lastActivityTs : 0,
     });
-    const lens = detectLens(s);
     return { ...s, status, lens };
   }
 
