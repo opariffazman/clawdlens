@@ -15,6 +15,21 @@ bun run dump     # headless debug view
 bun test         # the engine test suite
 ```
 
+## Fonts
+
+harness-flow uses [Nerd Font](https://www.nerdfonts.com/) glyphs and powerline
+separators for its icons by default. For them to render, install a Nerd Font and
+set it as your terminal font:
+
+- macOS: `brew install --cask font-jetbrains-mono-nerd-font` (or FiraCode/Hack Nerd Font)
+- Linux: download from https://www.nerdfonts.com/font-downloads and install, then select it in your terminal
+
+No Nerd Font? Run with the plain-Unicode icon set instead:
+
+```bash
+HF_ICONS=unicode bun run dev
+```
+
 ## Keys
 
 `j/k` sessions · `Tab` panels · `h/l` scrub timeline · `g/G` start/live ·
