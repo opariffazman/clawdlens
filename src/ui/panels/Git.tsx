@@ -20,7 +20,16 @@ export function Git({ commits, width, height, progress }: { commits: Commit[]; w
   const revealed = Math.max(1, Math.ceil(progress * total)); // synced to the Flow cursor
   const animating = progress < 1;
 
-  const graph = layoutGitGraph(commits.slice(0, revealed)); // lay out only revealed commits
+  // `git log` is date-desc (HEAD first) — the lane algorithm needs that order.
+  // We DISPLAY chronologically (oldest at top, HEAD at bottom) like the Flow:
+  // flip the y-axis, reveal oldest-first, and follow the building edge.
+  const graph = layoutGitGraph(commits);
+  const rowsTotal = graph.rows;                 // (total-1)*ROW_STRIDE + 1
+  const minIdx = total - revealed;              // date-desc index threshold (>= = revealed/older)
+  const minY = minIdx * ROW_STRIDE;             // date-desc y threshold for revealed cells
+  const buildingY = rowsTotal - 1 - minY;       // chrono row of the newest revealed commit
+  const top = Math.max(0, Math.min(Math.max(0, rowsTotal - height), buildingY - height + 2));
+
   const refColor = RGBA.fromHex(theme.warn);
   const subjColor = RGBA.fromHex(theme.fg);
   const hashColor = RGBA.fromHex(theme.ok);
@@ -32,32 +41,37 @@ export function Git({ commits, width, height, progress }: { commits: Commit[]; w
       live={animating}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
-        const span = graph.rows + TAIL;
+        const span = rowsTotal + TAIL;
         const headRow = animating ? ((globalThis.performance?.now?.() ?? 0) / 120) % span : -999;
-        // wires (energy pulse while building, dim once settled)
+
+        // wires — chronological (oldest top), pulse flows downward toward HEAD
         for (const seg of graph.segments) {
           for (const cell of seg.cells) {
-            const y = cell.y;
+            if (cell.y < minY) continue; // not yet revealed (newer)
+            const chronoY = rowsTotal - 1 - cell.y;
+            const y = chronoY - top;
             if (y < 0 || y >= height) continue;
             const x = ICON_COL + cell.x;
             if (x < 0 || x >= width) continue;
             const laneHex = theme.laneColors[Math.floor(cell.x / COL_WIDTH) % theme.laneColors.length]!;
-            let intensity = 0.4; // dim lane tint at rest, so each branch has its own colour
+            let intensity = 0.4; // dim lane tint at rest → each branch keeps its colour
             if (animating) {
-              const d = (((headRow - cell.y) % span) + span) % span;
+              const d = (((headRow - chronoY) % span) + span) % span;
               intensity = Math.max(0.4, pulseIntensity(d, TAIL));
             }
             buffer.setCell(x, y, cell.ch, RGBA.fromHex(lerpHex(theme.wireDim, laneHex, intensity)), TRANSPARENT);
           }
         }
+
         // commit nodes + labels
         for (const node of graph.nodes) {
-          const y = node.row * ROW_STRIDE;
+          if (node.row < minIdx) continue; // not revealed (newer than the building edge)
+          const chronoY = rowsTotal - 1 - node.row * ROW_STRIDE;
+          const y = chronoY - top;
           if (y < 0 || y >= height) continue;
           const commit = commits[node.row]!;
           const x = ICON_COL + node.column * COL_WIDTH;
-          const nodeLane = RGBA.fromHex(theme.laneColors[node.column % theme.laneColors.length]!);
-          buffer.setCell(x, y, "●", nodeLane, TRANSPARENT);
+          buffer.setCell(x, y, "●", RGBA.fromHex(theme.laneColors[node.column % theme.laneColors.length]!), TRANSPARENT);
           const labelX = ICON_COL + (graph.columns + 1) * COL_WIDTH;
           const refStr = commit.refs.length ? `(${commit.refs.join(", ")}) ` : "";
           drawStr(buffer, labelX, y, commit.shortHash + " ", hashColor, TRANSPARENT);
