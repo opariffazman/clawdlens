@@ -167,7 +167,7 @@ interface SessionState {
     webCalls: number;
   };
   cost: { estimatedUSD: number };
-  narrative: NarrativeEvent[];   // ring buffer, ~200
+  narrative: NarrativeEvent[];   // full session history (lazy-paged from JSONL beyond an in-memory cap)
   flow: FlowGraph;               // nodes + lanes (subagents) + edges
   toolStats: Map<string, number>;
   fileHeat: Map<string, { reads: number; edits: number; lastTs: number }>;
@@ -203,6 +203,14 @@ interface LensState {
   phaseHistory: { phase: string; ts: number }[];
   skillGroups: { skill: string; nodeIds: string[]; ts: number }[];
 }
+
+interface Playback {              // per-session presentation state
+  mode: 'live' | 'paused' | 'history';
+  cursor: number;                 // index into the beat history (head = live)
+  speed: number;                  // playback multiplier
+  backlog: number;                // beats behind live (drives catch-up + marker)
+  pulse: boolean;                 // energy-pulse animation on/off
+}
 ```
 
 ## 9. Core modules (pure, testable, no I/O)
@@ -221,12 +229,15 @@ interface LensState {
   1,000,000. Prices labeled approximate.
 - `core/lens.ts` — pluggable workflow detectors; `superpowers` lens first.
 - `core/flow-layout.ts` — assign nodes to lanes (main + subagent lanes) and
-  compute spine/branch/rejoin edges, git-graph style. Highest-complexity pure
-  module; unit-tested heavily.
-- `core/player.ts` — paced queue: enqueue beats, coalesce, drain with adaptive
-  catch-up (§10). Emits "presented" beats to the UI.
+  compute spine/branch/rejoin edges, git-graph style. Emits each edge as an
+  ordered list of cell coordinates so the renderer can animate a pulse along it
+  (§14). Highest-complexity pure module; unit-tested heavily.
+- `core/player.ts` — paced queue + playback cursor: enqueue beats, coalesce,
+  drain with adaptive catch-up; modes `live | paused | history` with
+  `stepBack/stepForward/toStart/toLive` navigation over the full beat history
+  (§10). Emits the currently-presented beat window to the UI.
 
-## 10. Pacing / player engine
+## 10. Pacing, playback, and history navigation
 
 The player decouples how fast events arrive from how fast they're shown.
 
@@ -239,8 +250,17 @@ The player decouples how fast events arrive from how fast they're shown.
   caught up, return to the calm default.
 - **Reconcile indicator:** the status badge and gauges are always real-now; the
   Flow head may trail. A header marker shows `▸ live` or `▸ +N catching up`.
-- **Controls:** `+`/`-` adjust playback speed; `space` pauses one session for
-  study (badge/gauge keep updating; the narrative freezes).
+- **Modes:** `live` (following reality), `paused` (frozen for study; badge and
+  gauge keep updating, the narrative freezes), and `history` (scrubbing the
+  past).
+- **History navigation:** the full beat history is retained per session, so you
+  can scrub back to catch what the slow burn carried past, then resume. `←→` /
+  `h l` step a beat; `[` `]` jump a chunk; `g` to the start; `G` / `End` snaps
+  back to live and resumes paced playback ("resume normally"). While scrubbing,
+  the Flow renders the graph as-of the cursor and the marker reads
+  `⏪ history 142/318`.
+- **Controls:** `+`/`-` adjust playback speed; `space` pause/play; `p` toggles
+  the energy-pulse animation.
 
 ## 11. Status heuristics (JSONL-only, honest)
 
@@ -289,7 +309,8 @@ resolve this (future). Optional v1 stretch: cross-check live `claude` PIDs via
   - **Header:** project · branch · model + title/prompt.
   - **Active panel:** Flow (default) | Files | Todos | Log.
   - **Footer gauge line:** context gauge (animated tween), token k/k, est. $,
-    elapsed, and the `▸ live` / `▸ +N` marker.
+    elapsed, a thin timeline scrubber bar, and the playback marker — `▸ live`,
+    `▸ +N catching up`, `⏸ paused`, or `⏪ history 142/318`.
 - **Flow panel (flagship):** vertical metro / git-graph. Each agent action is a
   node along a spine; `Task` spawns fork to a parallel lane and rejoin on return.
   With the lens on, nodes group under skill super-nodes. New nodes build in
@@ -329,14 +350,31 @@ Pure, pluggable detector that overlays workflow structure on the generic flow.
 - Gauge bar eases toward new context %.
 - Active row's sparkline scrolls with token rate.
 - Subtle pulse on `waiting` / `error` rows.
+- **Energy-pulse flow:** a bright-headed, fading-tail pulse travels along active
+  Flow edges to show data/flow moving between nodes — like current through a
+  wire. Implemented by interpolating each connector cell's truecolor fg by its
+  distance from the moving pulse head, alpha-blended over the dim base wire,
+  driven by OpenTUI's Timeline at ~12–20 fps. Idle edges stay dim/static. Calm
+  and slow by default; `p` toggles it, intensity is configurable.
+  **Feasibility (verified):** OpenTUI provides 24-bit truecolor per-cell
+  rendering, RGBA alpha blending / double-buffered cell composition, a Timeline
+  animation API, and a configurable-FPS render loop — exactly what this effect
+  needs.
 - Calm by default — "cool," not seizure-inducing. ~12 fps tick, decoupled from
   data poll.
 
 ## 15. Keybindings
 
-`↑↓` / `j k` move · `1-9` jump · `⏎` pin/follow · `Tab` / `h l` cycle panels ·
-`+` / `-` playback speed · `space` pause-and-study · `w` toggle Workflow Lens ·
-`/` filter · `r` rescan · `?` help overlay · `q` / `Ctrl-C` quit.
+- **Sessions (vertical):** `↑↓` / `j k` move · `1-9` jump · `⏎` pin/follow.
+- **Panels:** `Tab` / `Shift-Tab` cycle (Flow / Files / Todos / Log).
+- **Timeline (horizontal):** `←→` / `h l` step one beat · `[` `]` jump a chunk ·
+  `g` to start · `G` / `End` resume to live · `space` pause/play.
+- **Playback:** `+` / `-` speed · `p` toggle energy-pulse.
+- **Other:** `w` toggle Workflow Lens · `/` filter · `r` rescan · `?` help
+  overlay · `q` / `Ctrl-C` quit.
+
+(`j k` = sessions on the vertical axis; `h l` = scrub the timeline on the
+horizontal axis — vim-coherent.)
 
 ## 16. Error handling and edge cases
 
@@ -401,15 +439,16 @@ I/O and is fully unit-testable. The UI is a thin render of the store.
 
 **v1 (this spec):** discovery + incremental tail; Mission Control screen; live
 session list with badges, title, sparkline; the vertical-metro Flow (absorbing
-the subagent tree); paced coalescing player with adaptive catch-up and
-speed/pause controls; Files / Todos / Log panels; context/token/cost gauge;
-pluggable Workflow Lens with the superpowers detector + phase ribbon;
-keybindings; animations; theme; full pure-core test suite.
+the subagent tree); paced coalescing player with adaptive catch-up, speed/pause
+controls, and full history-scrubbing (resume-to-live); Files / Todos / Log
+panels; context/token/cost gauge; pluggable Workflow Lens with the superpowers
+detector + phase ribbon; keybindings; animations including the energy-pulse
+flow; theme; full pure-core test suite.
 
 **Later (out of scope for v1):** hooks integration for true permission-wait +
-zero-latency; PID liveness cross-check; history scrollback / replay; grid
-"wall" mode toggle; desktop notifications; attach / manage (would require a
-manager mode); additional workflow lenses.
+zero-latency; PID liveness cross-check; grid "wall" mode toggle; desktop
+notifications; attach / manage (would require a manager mode); additional
+workflow lenses.
 
 ## 20. Known limitations
 
@@ -420,6 +459,8 @@ manager mode); additional workflow lenses.
   pacing of the narrative.
 - Node-flow auto-layout + edge routing + progressive animation is the
   highest-complexity component; the Log panel is the always-works fallback.
+- Full per-session beat history is held in memory for scrubbing; beyond a
+  configurable cap, older beats are lazily re-read from the JSONL on demand.
 
 ## 21. Open questions
 
