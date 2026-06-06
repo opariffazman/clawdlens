@@ -3,6 +3,7 @@ import { layoutFlow, ROW_STRIDE } from "../../core/flow-layout";
 import type { Beat } from "../../core/types";
 import { theme } from "../theme";
 import { pulseIntensity, lerpHex } from "../anim";
+import { iconFor } from "../icons";
 
 interface Props {
   beats: Beat[]; // presented (paced) beats from the player
@@ -74,7 +75,7 @@ export function Flow({ beats, cursor, pulse, width, height }: Props) {
           const x = ICON_COL - 2 + node.column * 2;
           if (x < 0 || x >= width) continue;
           buffer.setCell(x, y, focused ? "◉" : "○", iconColor, bg);
-          const text = ` ${b.icon ? b.icon + " " : ""}${b.label}${b.count > 1 ? ` ×${b.count}` : ""}${
+          const text = ` ${iconFor(b.iconKey)} ${b.label}${b.count > 1 ? ` ×${b.count}` : ""}${
             b.detail ? " · " + b.detail : ""
           }`;
           const clipped = text.slice(0, Math.max(0, width - x - 2));

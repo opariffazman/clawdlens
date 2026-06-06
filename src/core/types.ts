@@ -50,11 +50,15 @@ export type Status = "running" | "working" | "waiting" | "idle" | "dormant" | "e
 
 export type BeatKind = "thinking" | "text" | "tool" | "skill" | "result" | "wait" | "phase";
 
+export type IconKey =
+  | "bash" | "edit" | "read" | "search" | "web" | "task" | "skill"
+  | "thinking" | "text" | "todo" | "result" | "tool";
+
 export interface Beat {
   id: string;
   ts: number;                    // ms epoch
   kind: BeatKind;
-  icon: string;
+  iconKey: IconKey;
   label: string;
   detail?: string;
   count: number;                 // coalesced count, >= 1

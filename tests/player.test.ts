@@ -3,7 +3,7 @@ import { createPlayer } from "../src/core/player";
 import type { Beat } from "../src/core/types";
 
 function beat(id: string, label = "Bash", kind: Beat["kind"] = "tool"): Beat {
-  return { id, ts: 0, kind, icon: "x", label, count: 1, lane: "main" };
+  return { id, ts: 0, kind, iconKey: "tool", label, count: 1, lane: "main" };
 }
 
 test("coalesces consecutive same-kind same-label beats", () => {

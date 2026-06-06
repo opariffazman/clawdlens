@@ -33,8 +33,6 @@ test("project derived from cwd basename when no cwd field yet", () => {
   expect(s.project).toBe("foo");
 });
 
-import { TOOL_ICONS } from "../src/core/reducer";
-
 test("assistant content blocks become beats with labels and icons", () => {
   const s = feed([
     { type: "assistant", message: { model: "claude-opus-4-8", stop_reason: "tool_use", content: [
@@ -48,7 +46,7 @@ test("assistant content blocks become beats with labels and icons", () => {
   const bash = s.beats[2]!;
   expect(bash.label).toBe("Bash");
   expect(bash.detail).toBe("run tests");
-  expect(bash.icon).toBe(TOOL_ICONS.Bash!);
+  expect(bash.iconKey).toBe("bash");
   expect(bash.toolUseId).toBe("t1");
   expect(s.lastBlockKind).toBe("tool_use");
   expect(s.toolStats.Bash).toBe(1);

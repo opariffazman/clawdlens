@@ -2,6 +2,7 @@ import {
   type Entry, type SessionState, type ContentBlock, type Usage,
   newSessionTokens, newLensState,
 } from "./types";
+import type { IconKey } from "./types";
 import { addUsage, contextTokens, effectiveContextLimit, estimateCostUSD } from "./tokens";
 
 function basename(p: string): string {
@@ -9,12 +10,19 @@ function basename(p: string): string {
   return parts[parts.length - 1] || p;
 }
 
-export const TOOL_ICONS: Record<string, string> = {
-  Bash: "⚙", Edit: "✎", Write: "✎", Read: "",
-  Grep: "", Glob: "", WebSearch: "", WebFetch: "",
-  Task: "◆", Skill: "✦", TodoWrite: "☑", default: "◈",
-};
-function toolIcon(name: string): string { return TOOL_ICONS[name] ?? TOOL_ICONS.default!; }
+function iconKeyFor(name: string): IconKey {
+  switch (name) {
+    case "Bash": return "bash";
+    case "Edit": case "Write": case "NotebookEdit": return "edit";
+    case "Read": return "read";
+    case "Grep": case "Glob": return "search";
+    case "WebSearch": case "WebFetch": return "web";
+    case "Task": return "task";
+    case "Skill": return "skill";
+    case "TodoWrite": return "todo";
+    default: return "tool";
+  }
+}
 
 function fileOf(input: Record<string, unknown> | undefined): string | undefined {
   const p = input?.file_path ?? input?.path ?? input?.notebook_path;
@@ -140,26 +148,26 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
   const blocks = Array.isArray(m.content) ? m.content : [];
   for (const b of blocks as ContentBlock[]) {
     if (b.type === "thinking") {
-      pushBeat(s, { ts, kind: "thinking", icon: "◇", label: "thinking", lane, skill: e.attributionSkill });
+      pushBeat(s, { ts, kind: "thinking", iconKey: "thinking", label: "thinking", lane, skill: e.attributionSkill });
       s.lastBlockKind = "thinking";
     } else if (b.type === "text") {
       const text = (b.text ?? "").trim();
-      if (text) { pushBeat(s, { ts, kind: "text", icon: "○", label: "says", detail: text.slice(0, 80), lane, skill: e.attributionSkill }); s.lastBlockKind = "text"; }
+      if (text) { pushBeat(s, { ts, kind: "text", iconKey: "text", label: "says", detail: text.slice(0, 80), lane, skill: e.attributionSkill }); s.lastBlockKind = "text"; }
     } else if (b.type === "tool_use") {
       const name = b.name ?? "Tool";
       s.toolStats = { ...s.toolStats, [name]: (s.toolStats[name] ?? 0) + 1 };
       if (name === "Skill") {
         const skill = String(b.input?.skill ?? "skill");
-        pushBeat(s, { ts, kind: "skill", icon: TOOL_ICONS.Skill!, label: skill, lane, toolUseId: b.id, skill });
+        pushBeat(s, { ts, kind: "skill", iconKey: "skill", label: skill, lane, toolUseId: b.id, skill });
       } else if (name === "Task") {
         const sub = String(b.input?.subagent_type ?? b.input?.description ?? "subagent");
-        pushBeat(s, { ts, kind: "tool", icon: TOOL_ICONS.Task!, label: `Task · ${sub}`, lane, toolUseId: b.id, skill: e.attributionSkill });
+        pushBeat(s, { ts, kind: "tool", iconKey: "task", label: `Task · ${sub}`, lane, toolUseId: b.id, skill: e.attributionSkill });
         if (b.id) { s.openLanes = [...s.openLanes, b.id]; s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id }; }
       } else {
         const detail = name === "Bash"
           ? (typeof b.input?.description === "string" ? b.input.description as string : (typeof b.input?.command === "string" ? (b.input.command as string).slice(0, 60) : undefined))
           : fileOf(b.input) ?? (typeof b.input?.query === "string" ? (b.input.query as string).slice(0, 60) : undefined);
-        pushBeat(s, { ts, kind: "tool", icon: toolIcon(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill });
+        pushBeat(s, { ts, kind: "tool", iconKey: iconKeyFor(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill });
         if (b.id) s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id };
         bumpHeat(s, name, b.input, ts);
       }
