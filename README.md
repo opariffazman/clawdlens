@@ -57,7 +57,7 @@ ClawdLens is a passive reader. It tails the JSONL transcripts Claude Code writes
 (`discover → tailer → parse → reducer → store`), and renders the result with
 [OpenTUI](https://github.com/sst/opentui). It never writes to your sessions and
 installs no hooks. See
-[`docs/superpowers/specs/2026-06-06-harness-flow-design.md`](docs/superpowers/specs/2026-06-06-harness-flow-design.md)
+[the design spec](https://github.com/opariffazman/clawdlens/blob/main/docs/superpowers/specs/2026-06-06-harness-flow-design.md)
 for the original design.
 
 ## Limitations
