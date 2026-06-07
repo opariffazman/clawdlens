@@ -4,6 +4,7 @@ import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
 import { TRANSPARENT } from "./theme";
+import { shouldAnimate } from "./anim";
 import { Menu, pickerRows, helpRows, projectsOf, sessionsOf } from "./Menu";
 import { CommandBox } from "./CommandBox";
 import { filterCommands, commandSuggestions } from "../core/commands";
@@ -23,7 +24,6 @@ export function App({ store }: { store: Store }) {
   const [sessions, setSessions] = useState(store.sessions());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelId>(DEFAULT_PANEL);
-  const [pulse, setPulse] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
   const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
@@ -81,6 +81,7 @@ export function App({ store }: { store: Store }) {
   const progress = activePlayer && playerTotal > 0 ? cursor / playerTotal : 1;
   const lastAdvanceMs = activePlayer ? activePlayer.lastAdvanceMs() : -1;
   const intervalMs = activePlayer ? activePlayer.intervalMs() : 1000;
+  const animate = activePlayer ? shouldAnimate(activePlayer.mode(), lastAdvanceMs, intervalMs, Date.now()) : false;
 
   // Force a full repaint whenever the scroll position or layout changes — the
   // moments stale ghost cells form. Pulse-only frames (cursor unchanged) keep
@@ -89,7 +90,7 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, infoOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, infoOn, showHelp, animate, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
 
@@ -220,7 +221,7 @@ export function App({ store }: { store: Store }) {
           infoOn={infoOn}
           lastAdvanceMs={lastAdvanceMs}
           intervalMs={intervalMs}
-          pulse={pulse}
+          animate={animate}
           marker={marker}
           width={w}
           height={h}
