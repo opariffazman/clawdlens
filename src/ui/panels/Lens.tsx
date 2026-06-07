@@ -114,7 +114,7 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
   const laneHex = laneHexOf(ln.activeKind);
   const headi = animating ? Math.floor((now / 120) % 3) : 99;
   for (let i = 0; i < 3; i++) put(buf, x + i, y, "·", RGBA.fromHex(i === headi ? laneHex : theme.wireDim), w, h);
-  const glyph = ln.errored ? "✗" : iconFor(ln.actionIcon ?? STAGE_ICON[ln.activeKind] ?? "tool");
+  const glyph = ln.errored ? "✗" : iconFor(ln.actionIcon ?? (STAGE_ICON[ln.activeKind] ?? ln.activeKind) as IconKey);
   const col = ln.errored ? theme.err : (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex);
   put(buf, x + 4, y, glyph, RGBA.fromHex(col), w, h);
 }
