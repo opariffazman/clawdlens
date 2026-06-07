@@ -43,8 +43,8 @@ export function Header({ session, panel, marker }: { session: SessionState; pane
         </box>
       </box>
       <box style={{ flexDirection: "column", alignItems: "flex-end", backgroundColor: TRANSPARENT }}>
-        {rows.map((row, i) => (
-          <box key={i} style={{ flexDirection: "row" }}>
+        {rows.map((row) => (
+          <box key={row.map((h) => h.key).join(",")} style={{ flexDirection: "row" }}>
             {row.map((h) => (
               <box key={h.key} style={{ flexDirection: "row" }}>
                 <text fg={theme.accent}>{h.key}</text>

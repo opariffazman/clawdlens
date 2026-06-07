@@ -1,7 +1,6 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { tabBarCells, tabModel, type TabRole } from "../core/chrome";
 import type { PanelId, LensState } from "../core/types";
-import { PANELS } from "../core/types";
 import { SUPERPOWERS_PHASES } from "../core/lens";
 import { theme, TRANSPARENT } from "./theme";
 
@@ -17,22 +16,23 @@ export function TabBar({ panels, active, lens, width }: { panels: PanelId[]; act
       buffered
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
-        for (const c of tabBarCells(tabModel(panels, active), width)) {
+        const cells = tabBarCells(tabModel(panels, active), width);
+        for (const c of cells) {
           buffer.setCell(c.x, c.row, c.ch, roleColor(c.role), TRANSPARENT);
         }
         // phase ribbon on the seam (row 1), right-aligned, never overwriting the corner
         if (lens.lensId) {
-          const text = SUPERPOWERS_PHASES.join(" ");
-          let x = width - 2 - text.length;
-          for (const p of SUPERPOWERS_PHASES) {
-            const isActive = p === lens.activePhase;
-            const isDone = lens.phaseHistory.some((h) => h.phase === p) && !isActive;
-            const color = RGBA.fromHex(isActive ? theme.accent : isDone ? theme.ok : theme.dim);
-            if (x > 0 && x < width - 1) buffer.setCell(x, 1, " ", RGBA.fromHex(theme.dim), TRANSPARENT);
-            x += 1;
-            for (const ch of p) {
-              if (x > 0 && x < width - 1) buffer.setCell(x, 1, ch, color, TRANSPARENT);
+          const tabRight = cells.reduce((m, c) => (c.row === 0 ? Math.max(m, c.x) : m), 0);
+          const budget = SUPERPOWERS_PHASES.reduce((s, p) => s + 1 + p.length, 0); // leading space per phase
+          let x = width - 1 - budget;
+          if (x > tabRight + 2) { // only draw if it won't collide with the tabs
+            for (const p of SUPERPOWERS_PHASES) {
+              const isActive = p === lens.activePhase;
+              const isDone = lens.phaseHistory.some((h) => h.phase === p) && !isActive;
+              const color = RGBA.fromHex(isActive ? theme.accent : isDone ? theme.ok : theme.dim);
+              if (x > 0 && x < width - 1) buffer.setCell(x, 1, " ", RGBA.fromHex(theme.dim), TRANSPARENT);
               x += 1;
+              for (const ch of p) { if (x > 0 && x < width - 1) buffer.setCell(x, 1, ch, color, TRANSPARENT); x += 1; }
             }
           }
         }

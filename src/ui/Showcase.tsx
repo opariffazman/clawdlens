@@ -1,6 +1,5 @@
 import type { SessionState } from "../core/types";
-import { theme } from "./theme";
-import { TRANSPARENT } from "./theme";
+import { theme, TRANSPARENT } from "./theme";
 import { Flow } from "./panels/Flow";
 import { Files } from "./panels/Files";
 import { Tasks } from "./panels/Tasks";
@@ -32,7 +31,7 @@ interface Props {
 export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height, commits, full, progress }: Props) {
   if (!session) {
     return (
-      <box style={{ flexGrow: 1, border: true, padding: 1, justifyContent: "center", alignItems: "center" }}>
+      <box style={{ flexGrow: 1, border: true, borderStyle: "rounded", borderColor: theme.accent, backgroundColor: TRANSPARENT, padding: 1, justifyContent: "center", alignItems: "center" }}>
         <text fg={theme.dim}>No session selected. Launch Claude Code somewhere — it will appear on the left.</text>
       </box>
     );
