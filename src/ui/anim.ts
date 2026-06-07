@@ -9,6 +9,14 @@ export function pulseIntensity(d: number, tailLen: number): number {
   return 1 - d / tailLen;
 }
 
+// 0..1 progress from the last advance toward the next. Parks at 1 (head sits on
+// the newest node, breathing) when there is no advance to interpolate from.
+export function pulsePhase(now: number, lastAdvanceMs: number, intervalMs: number): number {
+  if (lastAdvanceMs < 0 || intervalMs <= 0) return 1;
+  const p = (now - lastAdvanceMs) / intervalMs;
+  return Math.max(0, Math.min(1, p));
+}
+
 function clampByte(n: number): number { return Math.max(0, Math.min(255, Math.round(n))); }
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
@@ -22,4 +30,28 @@ export function lerpHex(a: string, b: string, t: number): string {
   const [br, bg, bb] = hexToRgb(b);
   const k = Math.max(0, Math.min(1, t));
   return rgbToHex(ar + (br - ar) * k, ag + (bg - ag) * k, ab + (bb - ab) * k);
+}
+
+// fg-only comet gradient along the spine. `d` = cells from the head (0 = head).
+// Two-stage blend: dim→lane by pulse intensity, then lane→hot concentrated at the
+// head (t²). `floor` keeps a minimum lane tint (Git's resting branch color).
+export function cometColor(
+  d: number,
+  tail: number,
+  laneHex: string,
+  hotHex: string,
+  dimHex: string,
+  floor = 0,
+): string {
+  const t = pulseIntensity(d, tail); // 1 at head → 0 past the tail
+  const laneAmt = Math.max(floor, t);
+  if (laneAmt <= 0) return dimHex;
+  const base = lerpHex(dimHex, laneHex, laneAmt);
+  return lerpHex(base, hotHex, t * t);
+}
+
+// slow sine brightness for the parked head, mapped to [0.6, 1.0].
+export function breathe(now: number, periodMs = 1800): number {
+  const s = 0.5 + 0.5 * Math.sin((2 * Math.PI * now) / periodMs);
+  return 0.6 + 0.4 * s;
 }

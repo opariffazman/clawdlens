@@ -68,6 +68,8 @@ export function createPlayer(opts: PlayerOpts = {}) {
     setLoop(on: boolean) { loop = on; },
     isLoop(): boolean { return loop; },
     speed(): number { return speed; },
+    intervalMs(): number { return interval(); },
+    lastAdvanceMs(): number { return lastAdvanceAt; },
     pause() { if (mode === "live") mode = "paused"; },
     play() { if (mode === "paused") mode = "live"; },
     stepBack() { mode = "history"; cursor = Math.max(0, cursor - 1); },
