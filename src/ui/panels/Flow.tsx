@@ -30,7 +30,7 @@ export function Flow({ beats, cursor, pulse, lastAdvanceMs, intervalMs, width, h
 
   // viewport: center on the cursor, clamped so we never scroll past the ends.
   const total = graph.rows;
-  const top = Math.max(0, Math.min(Math.max(0, total - height), cursor * ROW_STRIDE - Math.floor(height / 2)));
+  const top = Math.max(0, Math.min(Math.max(0, total - height), (cursor - 1) * ROW_STRIDE - Math.floor(height / 2)));
 
   return (
     <box
