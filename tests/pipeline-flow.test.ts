@@ -82,3 +82,29 @@ test("detail prefers beat detail over label", () => {
   const f = deriveFlow([beat({ kind: "text", label: "L", detail: "the detail" })], 1, 3);
   expect(f.main.detail).toBe("the detail");
 });
+
+test("live counts climb with the cursor (coarse)", () => {
+  const beats = [beat({ kind: "thinking" }), beat({ kind: "tool", ok: true }), beat({ kind: "thinking" })];
+  expect(deriveFlow(beats, 1, 3).main.counts["think"]).toBe(1);
+  const f = deriveFlow(beats, 3, 3).main;
+  expect(f.counts["think"]).toBe(2);
+  expect(f.counts["tool"]).toBe(1);
+  expect(f.counts["result"]).toBe(1);
+});
+
+test("ok/err tally live from completed tools", () => {
+  const f = deriveFlow([beat({ kind: "tool", ok: true }), beat({ kind: "tool", ok: false })], 2, 3).main;
+  expect(f.ok).toBe(1);
+  expect(f.err).toBe(1);
+});
+
+test("fine grain splits tool counts by action; coarse lumps them", () => {
+  const beats = [beat({ kind: "tool", iconKey: "bash", ok: true }), beat({ kind: "tool", iconKey: "edit", ok: true })];
+  const fine = deriveFlow(beats, 2, 5, "fine").main;
+  expect(fine.counts["bash"]).toBe(1);
+  expect(fine.counts["edit"]).toBe(1);
+  expect(fine.counts["tool"]).toBeUndefined();
+  expect(fine.activeKind).toBe("result");
+  const coarse = deriveFlow(beats, 2, 5, "coarse").main;
+  expect(coarse.counts["tool"]).toBe(2);
+});
