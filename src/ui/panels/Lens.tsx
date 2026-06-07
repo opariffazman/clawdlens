@@ -1,6 +1,6 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
-import { coarseCardRect, fineCardLayout, cardWire, type Rect, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
+import { coarseCardRect, pipeForward, pipeReturn, pipeBranch, type Rect, type Cell, LEFT, TOP, CARD_H } from "../../core/pipeline-geometry";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
 import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
@@ -31,8 +31,7 @@ function laneHexOf(kind: string) {
 }
 function clip(s: string, n: number) { return s.length > n ? s.slice(0, Math.max(0, n - 1)) + "…" : s; }
 function statusHex(s: Status) {
-  return s === "error" ? theme.err : s === "waiting" ? theme.warn
-    : s === "idle" || s === "dormant" ? theme.dim : theme.ok;
+  return s === "error" ? theme.err : s === "waiting" ? theme.warn : s === "idle" || s === "dormant" ? theme.dim : theme.ok;
 }
 
 function put(buf: OptimizedBuffer, x: number, y: number, ch: string, fg: RGBA, w: number, h: number) {
@@ -47,10 +46,7 @@ function drawCard(buf: OptimizedBuffer, r: Rect, icon: string, name: string, con
   const title = ` ${icon} ${name} `;
   put(buf, r.x, r.y, "╭", border, w, h);
   put(buf, r.x + r.w - 1, r.y, "╮", border, w, h);
-  for (let i = 1; i < r.w - 1; i++) {
-    const ch = title[i - 1];
-    put(buf, r.x + i, r.y, ch ?? "─", ch ? contentFg : border, w, h);
-  }
+  for (let i = 1; i < r.w - 1; i++) { const ch = title[i - 1]; put(buf, r.x + i, r.y, ch ?? "─", ch ? contentFg : border, w, h); }
   put(buf, r.x, r.y + 1, "│", border, w, h);
   put(buf, r.x + r.w - 1, r.y + 1, "│", border, w, h);
   drawStr(buf, r.x + 1, r.y + 1, clip(content, r.w - 3), contentFg, w, h);
@@ -61,17 +57,16 @@ function drawCard(buf: OptimizedBuffer, r: Rect, icon: string, name: string, con
 }
 
 function drawBurst(buf: OptimizedBuffer, cx: number, cy: number, kind: "commit" | "branch", phase: number, laneHex: string, w: number, h: number) {
-  const r = Math.round(phase * 3);
+  const r = Math.min(2, Math.round(phase * 2));
   const fade = 1 - phase;
   if (r <= 0 || fade <= 0) return;
   const col = RGBA.fromHex(lerpHex(theme.wireDim, kind === "commit" ? laneHex : theme.warn, fade));
   if (kind === "commit") {
-    const ring: [number, number][] = [[r, 0], [-r, 0], [0, 1], [0, -1], [r - 1, 1], [-(r - 1), -1]];
-    const g = "✦✧·*";
+    const ring: [number, number][] = [[r, 0], [-r, 0], [0, -1], [r - 1, -1]];
+    const g = "✦✧·";
     ring.forEach(([dx, dy], i) => put(buf, cx + dx, cy + dy, g[i % g.length]!, col, w, h));
   } else {
-    ([[r, 0], [r, -1], [r - 1, 1], [1, -1]] as [number, number][]).forEach(([dx, dy]) => put(buf, cx + dx, cy + dy, "*", col, w, h));
-    put(buf, cx + 1, cy, "+", col, w, h);
+    ([[r, 0], [r, -1], [1, -1]] as [number, number][]).forEach(([dx, dy]) => put(buf, cx + dx, cy + dy, "*", col, w, h));
   }
 }
 
@@ -85,10 +80,7 @@ function drawHud(buf: OptimizedBuffer, flow: { main: LaneFlow; agentsLive: numbe
   for (let x = LEFT + 1; x < w - 2; x++) { put(buf, x, top, "─", border, w, h); put(buf, x, top + bandH - 1, "─", border, w, h); }
   put(buf, w - 2, top, "┐", border, w, h);
   put(buf, w - 2, top + bandH - 1, "┘", border, w, h);
-  for (let y = top + 1; y < top + bandH - 1; y++) {
-    put(buf, LEFT, y, "│", border, w, h);
-    put(buf, w - 2, y, "│", border, w, h);
-  }
+  for (let y = top + 1; y < top + bandH - 1; y++) { put(buf, LEFT, y, "│", border, w, h); put(buf, w - 2, y, "│", border, w, h); }
   drawStr(buf, LEFT + 2, top, " NOW ", RGBA.fromHex(theme.accent), w, h);
   const m = flow.main;
   const nowLine = m.activeKind
@@ -119,28 +111,28 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
   put(buf, x + 4, y, glyph, RGBA.fromHex(col), w, h);
 }
 
+// pick the routed pipe for a transition between two coarse kinds
+function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: number): Cell[] {
+  const a = layout.get(from); const b = layout.get(to);
+  if (!a || !b) return [];
+  if (a.y === b.y && b.x > a.x) return pipeForward(a, b);
+  if (a.y === b.y && b.x < a.x) return pipeReturn(a, b, channelY);
+  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]);
+}
+
 export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
-  const grain = infoOn ? "fine" : "coarse";
-  const flow = deriveFlow(presented, cursor, TRAIL_HOPS, grain);
+  const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const idle = status === "idle" || status === "dormant" || status === "waiting";
   const animating = pulse && !idle;
 
-  let presentKinds: string[];
-  let layout: Map<string, Rect>;
-  let backbone: [string, string][];
-  if (grain === "coarse") {
-    presentKinds = [...COARSE_STAGES];
-    if ((flow.main.counts["skill"] ?? 0) > 0) presentKinds.push("skill");
-    layout = new Map(presentKinds.map((k) => [k, coarseCardRect(k as Parameters<typeof coarseCardRect>[0])]));
-    backbone = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
-    if (presentKinds.includes("skill")) backbone.push(["tool", "skill"]);
-  } else {
-    // fine: a card per node that has fired (incl. synthetic result). No dense
-    // static backbone — the live comet/trail carries the flow across the strip.
-    presentKinds = Object.keys(flow.main.counts);
-    layout = fineCardLayout(presentKinds, width);
-    backbone = [];
-  }
+  const presentKinds = [...COARSE_STAGES];
+  const showSkill = !infoOn && (flow.main.counts["skill"] ?? 0) > 0;
+  if (showSkill) presentKinds.push("skill");
+  const layout = new Map<string, Rect>(presentKinds.map((k) => [k, coarseCardRect(k as Parameters<typeof coarseCardRect>[0])]));
+  const channelY = TOP + CARD_H;
+
+  const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
+  if (showSkill) backbone.push(["tool", "skill"]);
 
   return (
     <box
@@ -154,21 +146,17 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
 
         for (const [a, b] of backbone) {
-          const ra = layout.get(a); const rb = layout.get(b);
-          if (!ra || !rb) continue;
-          for (const c of cardWire(ra, rb)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          for (const c of wireFor(a, b, layout, channelY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
         }
 
         const trail = flow.main.trail;
         for (let i = 0; i + 1 < trail.length; i++) {
-          const ra = layout.get(trail[i]!); const rb = layout.get(trail[i + 1]!);
-          if (!ra || !rb) continue;
-          const cells = cardWire(ra, rb);
+          const cells = wireFor(trail[i]!, trail[i + 1]!, layout, channelY);
+          if (cells.length === 0) continue;
           const laneHex = laneHexOf(trail[i + 1]!);
           if (i === trail.length - 2 && animating) {
             const head = phase * cells.length;
-            cells.forEach((c, ci) => put(buffer, c.x, c.y, flow.main.errored ? "┉" : c.ch,
-              RGBA.fromHex(cometColor(head - ci, TAIL, flow.main.errored ? theme.err : laneHex, theme.pulseHot, theme.wireDim, 0.2 + 0.3 * tempo)), width, height));
+            cells.forEach((c, ci) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(cometColor(head - ci, TAIL, flow.main.errored ? theme.err : laneHex, theme.pulseHot, theme.wireDim, 0.2 + 0.3 * tempo)), width, height));
           } else {
             const baseI = 0.2 + 0.3 * ((i + 1) / Math.max(1, trail.length - 1));
             cells.forEach((c) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(lerpHex(theme.wireDim, laneHex, baseI)), width, height));
@@ -180,8 +168,7 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
           const active = k === flow.main.activeKind;
           const laneHex = laneHexOf(k);
           const border = RGBA.fromHex(active ? (flow.main.errored ? theme.err : (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex)) : theme.dim);
-          const idleIcon = (STAGE_ICON[k] ?? k) as IconKey; // coarse stage icon, else the fine kind is itself an IconKey
-          const icon = iconFor(active ? (flow.main.actionIcon ?? idleIcon) : idleIcon);
+          const icon = iconFor(active ? (flow.main.actionIcon ?? STAGE_ICON[k] ?? "tool") : (STAGE_ICON[k] ?? "tool"));
           const content = k === "result" ? `✓${flow.main.ok} ✗${flow.main.err}` : `×${flow.main.counts[k] ?? 0}`;
           drawCard(buffer, r, icon, k, content, RGBA.fromHex(active ? theme.fg : theme.dim), border, active, width, height);
         }
@@ -189,17 +176,16 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
         const ak = flow.main.activeKind;
         if (flow.main.milestone && ak && layout.has(ak) && !(flow.main.milestone === "commit" && flow.main.errored)) {
           const r = layout.get(ak)!;
-          drawBurst(buffer, r.x + (r.w >> 1), r.y + r.h, flow.main.milestone, phase, laneHexOf(ak), width, height);
+          drawBurst(buffer, r.x + (r.w >> 1), r.y, flow.main.milestone, phase, laneHexOf(ak), width, height);
         }
 
-        const cardsBottom = layout.size > 0 ? Math.max(...[...layout.values()].map((r) => r.y + r.h)) : TOP + CARD_H;
-        let sy = cardsBottom + 1; // below the actual card block (handles fine-grain wrapping)
+        const bottoms = [...layout.values()].map((r) => r.y + r.h);
+        let sy = Math.max(channelY + 1, ...bottoms) + 1;
         if (flow.agentsLive > 0) {
           drawStr(buffer, LEFT, sy, `▸ ${flow.agentsLive} agent${flow.agentsLive > 1 ? "s" : ""} live`, RGBA.fromHex(theme.accent), width, height);
           sy += 1;
           flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
         }
-
         drawHud(buffer, flow, status, tempo, total, cursor, width, height);
       }}
     />
