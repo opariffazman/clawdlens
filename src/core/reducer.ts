@@ -7,9 +7,13 @@ import { addUsage, contextTokens, effectiveContextLimit, estimateCostUSD } from 
 
 export function gitMilestone(command: string | undefined): "commit" | "branch" | undefined {
   if (!command) return undefined;
-  if (/\bgit\b[^\n]*\bcommit\b/.test(command) && !/--dry-run/.test(command)) return "commit";
-  if (/\bgit\s+(?:checkout\s+-b|switch\s+-c)\b/.test(command)) return "branch";
-  if (/\bgit\s+branch\s+[^-\s]\S*/.test(command)) return "branch"; // `git branch <name>` (not -d/-D/--list)
+  // `git [global flags] <subcommand>` — anchored so we don't fire on echoed
+  // strings like `... || echo "nothing to commit"` or `git diff || ...commit`.
+  // Global flags may include value-taking options (e.g. `-C /path`, `--work-tree=/x`),
+  // so we skip any non-subcommand tokens: flags (-x / --x) and their separate args.
+  if (/\bgit\s+(?:(?:-\S+(?:\s+\S+)?|--\S+)\s+)*commit\b/.test(command) && !/--dry-run/.test(command)) return "commit";
+  if (/\bgit\s+(?:(?:-\S+(?:\s+\S+)?|--\S+)\s+)*(?:checkout\s+-b|switch\s+-c)\b/.test(command)) return "branch";
+  if (/\bgit\s+(?:(?:-\S+(?:\s+\S+)?|--\S+)\s+)*branch\s+[^-\s]\S*/.test(command)) return "branch"; // `git branch <name>`
   return undefined;
 }
 
