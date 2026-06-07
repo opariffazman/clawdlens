@@ -28,8 +28,13 @@ function xOf(col: number) { return LEFT + col * COL_GAP; }
 function laneOf(col: number) { return theme.laneColors[col % theme.laneColors.length]!; }
 function frac(n: number, max: number) { return max > 0 ? n / max : 0; }
 
-function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA) {
-  for (let i = 0; i < str.length; i++) buf.setCell(x + i, y, str[i]!, fg, TRANSPARENT);
+function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA, width: number) {
+  for (let i = 0; i < str.length; i++) {
+    const xi = x + i;
+    if (xi < 0) continue;
+    if (xi >= width) break;
+    buf.setCell(xi, y, str[i]!, fg, TRANSPARENT);
+  }
 }
 function barChar(f: number) {
   return BARS[Math.max(0, Math.min(BARS.length - 1, Math.round(f * (BARS.length - 1))))]!;
@@ -41,6 +46,7 @@ type Cell = { x: number; y: number; ch: string };
 function energyRun(
   buf: OptimizedBuffer, cells: Cell[], weight: number, maxWeight: number,
   laneHex: string, animating: boolean, now: number, restBoost: number, dir: 1 | -1,
+  width: number, height: number,
 ) {
   const n = cells.length;
   if (n === 0) return;
@@ -50,6 +56,7 @@ function energyRun(
   const head = animating ? (now * (0.5 + 1.6 * wf)) % span : -999;
   for (let i = 0; i < n; i++) {
     const c = cells[i]!;
+    if (c.x < 0 || c.x >= width || c.y < 0 || c.y >= height) continue;
     const pos = dir === 1 ? i : n - 1 - i;
     let intensity = rest;
     if (animating) {
@@ -108,7 +115,7 @@ export function Lens({ full, presented, cursor, pulse, width, height }: Props) {
           for (let x = start; x < end; x++) cells.push({ x, y: TOP, ch: "─" });
           cells.push({ x: end, y: TOP, ch: "▶" });
           const boost = fwd.some((e) => e === flareEdge) ? 0.45 : 0;
-          energyRun(buffer, cells, weight, graph.maxWeight, laneOf(c0), animating, now, boost, 1);
+          energyRun(buffer, cells, weight, graph.maxWeight, laneOf(c0), animating, now, boost, 1, width, height);
         }
 
         // back-edge arcs: top 2 by weight, stacked on rows below the row-0 stats
@@ -122,7 +129,7 @@ export function Lens({ full, presented, cursor, pulse, width, height }: Props) {
           for (let x = xb - 1; x > xa; x--) cells.push({ x, y: yArc, ch: "─" });
           cells.push({ x: xa, y: yArc, ch: "◂" });
           const boost = e === flareEdge ? 0.45 : 0;
-          energyRun(buffer, cells, e.weight, graph.maxWeight, laneOf(colOf(e.to)), animating, now, boost, -1);
+          energyRun(buffer, cells, e.weight, graph.maxWeight, laneOf(colOf(e.to)), animating, now, boost, -1, width, height);
         });
 
         // skill branch: vertical feeder from the row-1 skill node up into the spine
@@ -136,7 +143,7 @@ export function Lens({ full, presented, cursor, pulse, width, height }: Props) {
           const w = drawn
             .filter((e) => e.from === "skill" || e.to === "skill")
             .reduce((m, e) => Math.max(m, e.weight), 0);
-          energyRun(buffer, cells, w, graph.maxWeight, laneOf(skill.col), animating, now, 0, -1);
+          energyRun(buffer, cells, w, graph.maxWeight, laneOf(skill.col), animating, now, 0, -1, width, height);
         }
 
         // nodes + labels + stats
@@ -148,17 +155,18 @@ export function Lens({ full, presented, cursor, pulse, width, height }: Props) {
           const focused = n.kind === liveKind;
           const glyph = focused ? "◉" : n.count > 1 ? "◍" : "○";
           buffer.setCell(x, yGlyph, glyph, RGBA.fromHex(laneOf(n.col)), TRANSPARENT);
-          drawStr(buffer, x + 2, yGlyph, n.kind, RGBA.fromHex(focused ? theme.accent : theme.fg));
+          drawStr(buffer, x + 2, yGlyph, n.kind, RGBA.fromHex(focused ? theme.accent : theme.fg), width);
 
+          if (yStat >= height) continue;
           let cx = x + 2;
           const cnt = `×${n.count} `;
-          drawStr(buffer, cx, yStat, cnt, RGBA.fromHex(theme.dim));
+          drawStr(buffer, cx, yStat, cnt, RGBA.fromHex(theme.dim), width);
           cx += cnt.length;
-          buffer.setCell(cx, yStat, barChar(frac(n.count, graph.maxCount)), RGBA.fromHex(laneOf(n.col)), TRANSPARENT);
+          if (cx < width) buffer.setCell(cx, yStat, barChar(frac(n.count, graph.maxCount)), RGBA.fromHex(laneOf(n.col)), TRANSPARENT);
           cx += 2;
           if (n.kind === "result") {
-            if ((n.ok ?? 0) > 0) { const s = `✓${n.ok} `; drawStr(buffer, cx, yStat, s, RGBA.fromHex(theme.ok)); cx += s.length; }
-            if ((n.err ?? 0) > 0) { const s = `✗${n.err}`; drawStr(buffer, cx, yStat, s, RGBA.fromHex(theme.err)); }
+            if ((n.ok ?? 0) > 0) { const s = `✓${n.ok} `; drawStr(buffer, cx, yStat, s, RGBA.fromHex(theme.ok), width); cx += s.length; }
+            if ((n.err ?? 0) > 0) { const s = `✗${n.err}`; drawStr(buffer, cx, yStat, s, RGBA.fromHex(theme.err), width); }
           }
         }
       }}
