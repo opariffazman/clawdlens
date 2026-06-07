@@ -19,6 +19,8 @@ interface Props {
   panel: PanelId;
   presented: Beat[];
   cursor: number;
+  lastAdvanceMs: number;     // player cadence for the pulse
+  intervalMs: number;        // player cadence for the pulse
   pulse: boolean;
   lensOn: boolean;
   marker: string;
@@ -34,7 +36,7 @@ interface Props {
   paletteGhost: string;      // inline ghost completion
 }
 
-export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost }: Props) {
+export function Showcase({ session, panel, presented, cursor, lastAdvanceMs, intervalMs, pulse, lensOn, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, borderStyle: "rounded", borderColor: theme.accent, backgroundColor: TRANSPARENT, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -62,7 +64,7 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
         }}
       >
         {panel === "lens" && <Lens />}
-        {panel === "log" && <Flow beats={presented} cursor={cursor} pulse={pulse} width={width - 4} height={bodyHeight} />}
+        {panel === "log" && <Flow beats={presented} cursor={cursor} pulse={pulse} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} width={width - 4} height={bodyHeight} />}
         {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} sort={filesSort} />}
         {panel === "tasks" && <Tasks todos={agg.todos} lens={tasksLens} height={bodyHeight} progress={progress} hideDone={tasksHideDone} />}
         {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} progress={progress} />}

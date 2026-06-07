@@ -79,6 +79,8 @@ export function App({ store }: { store: Store }) {
   const playerTotal = activePlayer ? activePlayer.all().length : 0;
   const cursor = activePlayer ? activePlayer.cursor() : 0;
   const progress = activePlayer && playerTotal > 0 ? cursor / playerTotal : 1;
+  const lastAdvanceMs = activePlayer ? activePlayer.lastAdvanceMs() : -1;
+  const intervalMs = activePlayer ? activePlayer.intervalMs() : 1000;
 
   // Force a full repaint whenever the scroll position or layout changes — the
   // moments stale ghost cells form. Pulse-only frames (cursor unchanged) keep
@@ -242,6 +244,8 @@ export function App({ store }: { store: Store }) {
           panel={panel}
           presented={activePlayer ? activePlayer.presented() : []}
           cursor={cursor}
+          lastAdvanceMs={lastAdvanceMs}
+          intervalMs={intervalMs}
           pulse={pulse}
           lensOn={lensOn}
           marker={marker}
