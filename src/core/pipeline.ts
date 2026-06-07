@@ -82,7 +82,7 @@ export function buildPipeline(beats: Beat[]): PipelineGraph {
 
   // 3. edges over the COALESCED sequence (drop consecutive dupes -> no self-loops)
   const coalesced: PipeKind[] = [];
-  for (const s of steps) if (coalesced[coalesced.length - 1] !== s) coalesced.push(s);
+  for (const s of steps) if (coalesced.at(-1) !== s) coalesced.push(s);
 
   const edgeMap = new Map<string, PipeEdge>();
   for (let i = 0; i + 1 < coalesced.length; i++) {

@@ -2,11 +2,9 @@ import { test, expect } from "bun:test";
 import { buildPipeline, edgeVisible, EDGE_MIN_FRAC } from "../src/core/pipeline";
 import type { Beat } from "../src/core/types";
 
-let seq = 0;
 function beat(p: Partial<Beat>): Beat {
-  seq += 1;
   return {
-    id: p.id ?? `b${seq}`, ts: p.ts ?? 0, kind: p.kind ?? "tool",
+    id: p.id ?? "b", ts: p.ts ?? 0, kind: p.kind ?? "tool",
     iconKey: p.iconKey ?? "tool", label: p.label ?? "L", count: p.count ?? 1,
     lane: p.lane ?? "main", ...p,
   };
