@@ -112,6 +112,11 @@ export function newLensState(): LensState {
   return { lensId: null, activePhase: null, phaseHistory: [], skillGroups: [] };
 }
 
+// UI panel identity (kept in core so pure chrome helpers can reference it)
+export type PanelId = "lens" | "files" | "tasks" | "git" | "log";
+export const PANELS: PanelId[] = ["lens", "files", "tasks", "git", "log"];
+export const DEFAULT_PANEL: PanelId = "log";
+
 export interface SessionState {
   id: string;
   file: string;

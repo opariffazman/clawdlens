@@ -2,13 +2,12 @@ import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { layoutGitGraph } from "../../core/git-graph";
 import { ROW_STRIDE } from "../../core/flow-layout";
 import type { Commit } from "../../core/types";
-import { theme } from "../theme";
+import { theme, TRANSPARENT } from "../theme";
 import { pulseIntensity, lerpHex } from "../anim";
 
 const ICON_COL = 4;
 const COL_WIDTH = 2;
 const TAIL = 4;
-const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0);
 
 function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA, bg: RGBA) {
   for (let i = 0; i < str.length; i++) buf.setCell(x + i, y, str[i]!, fg, bg);
