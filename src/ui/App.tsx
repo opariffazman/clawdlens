@@ -5,19 +5,20 @@ import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
 import { TRANSPARENT } from "./theme";
 import { shouldAnimate } from "./anim";
-import { Menu, pickerRows, helpRows, projectsOf, sessionsOf } from "./Menu";
+import { Menu, pickerRows, helpRows } from "./Menu";
 import { CommandBox } from "./CommandBox";
 import { filterCommands, commandSuggestions } from "../core/commands";
+import { rankRows } from "../core/chrome";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { DEFAULT_PANEL } from "../core/types";
 import { createPlayer } from "../core/player";
 import { gitLog } from "../store/gitFetch";
 
 type Store = ReturnType<typeof createStore>;
-type PickerState = { open: boolean; stage: "projects" | "sessions"; project: string | null; index: number };
+type PickerState = { open: boolean; stage: "projects" | "sessions"; project: string | null; index: number; query: string; filtering: boolean };
 
 // transparent canvas → inherit the user's terminal background (OLED-friendly)
-const CLOSED: PickerState = { open: false, stage: "projects", project: null, index: 0 };
+const CLOSED: PickerState = { open: false, stage: "projects", project: null, index: 0, query: "", filtering: false };
 
 export function App({ store }: { store: Store }) {
   const renderer = useRenderer();
@@ -90,7 +91,7 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, infoOn, showHelp, animate, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, picker.query, picker.filtering, full, infoOn, showHelp, animate, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
 
@@ -101,7 +102,7 @@ export function App({ store }: { store: Store }) {
       case "panel.tasks": setPanel("tasks"); break;
       case "panel.git": setPanel("git"); break;
       case "panel.log": setPanel("log"); break;
-      case "nav.sessions": setPicker({ open: true, stage: "projects", project: null, index: 0 }); break;
+      case "nav.sessions": setPicker({ open: true, stage: "projects", project: null, index: 0, query: "", filtering: false }); break;
       case "view.help": setShowHelp(true); break;
       case "play.pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
       case "play.replay": {
@@ -141,22 +142,29 @@ export function App({ store }: { store: Store }) {
       return;
     }
     if (picker.open) {
-      const len = picker.stage === "projects"
-        ? projectsOf(sessions).length
-        : (picker.project ? sessionsOf(sessions, picker.project).length : 0);
+      const baseRows = pickerRows(sessions, picker.stage === "projects" ? null : picker.project);
+      const rows = rankRows(baseRows, picker.query);
+      const len = rows.length;
+      const printable = key.sequence && key.sequence.length === 1 && key.sequence >= " " && key.sequence !== "/" && kn !== "return" && kn !== "space";
+      if (kn === "/" ) { setPicker((p) => ({ ...p, filtering: true })); return; }
+      if (picker.filtering && kn === "escape") { setPicker((p) => ({ ...p, filtering: false, query: "", index: 0 })); return; }
+      if (picker.filtering && kn === "backspace") { setPicker((p) => ({ ...p, query: p.query.slice(0, -1), index: 0 })); return; }
+      if (picker.filtering && printable) { setPicker((p) => ({ ...p, query: p.query + key.sequence, index: 0 })); return; }
       if (kn === "escape" || kn === ":") {
-        setPicker(kn === "escape" && picker.stage === "sessions" ? { open: true, stage: "projects", project: null, index: 0 } : CLOSED);
-      } else if (kn === "j" || kn === "down") {
+        setPicker(kn === "escape" && picker.stage === "sessions"
+          ? { open: true, stage: "projects", project: null, index: 0, query: "", filtering: false }
+          : CLOSED);
+      } else if (kn === "down") {
         setPicker((p) => ({ ...p, index: Math.min(Math.max(0, len - 1), p.index + 1) }));
-      } else if (kn === "k" || kn === "up") {
+      } else if (kn === "up") {
         setPicker((p) => ({ ...p, index: Math.max(0, p.index - 1) }));
       } else if (kn === "return" || kn === "enter") {
         if (picker.stage === "projects") {
-          const proj = projectsOf(sessions)[Math.min(picker.index, len - 1)]?.project ?? null;
-          if (proj) setPicker({ open: true, stage: "sessions", project: proj, index: 0 });
+          const proj = (rows[Math.min(picker.index, len - 1)] as { id: string } | undefined)?.id ?? null;
+          if (proj) setPicker({ open: true, stage: "sessions", project: proj, index: 0, query: "", filtering: false });
         } else {
-          const s = (picker.project ? sessionsOf(sessions, picker.project) : [])[Math.min(picker.index, len - 1)];
-          if (s) switchTo(s.id);
+          const id = (rows[Math.min(picker.index, len - 1)] as { id: string } | undefined)?.id;
+          if (id) switchTo(id);
           setPicker(CLOSED);
         }
       }
@@ -238,11 +246,12 @@ export function App({ store }: { store: Store }) {
       {picker.open && (
         <Menu
           title={picker.stage === "projects" ? " PROJECTS · ⏎ open · esc close " : ` ${picker.project ?? ""} · ⏎ open · esc back `}
-          footer="⏎ open · j/k move · esc back"
-          rows={pickerRows(sessions, picker.stage === "projects" ? null : picker.project)}
+          footer="⏎ open · ↑↓ move · esc back"
+          rows={rankRows(pickerRows(sessions, picker.stage === "projects" ? null : picker.project), picker.query)}
           index={picker.index}
           width={w}
           height={h}
+          filter={picker.filtering ? picker.query : undefined}
         />
       )}
       {showHelp && (
