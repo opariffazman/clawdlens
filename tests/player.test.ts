@@ -57,3 +57,20 @@ test("replay without loop stops at the end", () => {
   for (let t = 0; t <= 100; t += 5) p.tick(t);
   expect(p.headIndex()).toBe(2); // all shown, then stops
 });
+
+test("intervalMs reflects speed (faster speed → smaller interval)", () => {
+  const p = createPlayer({ baseIntervalMs: 1000, minIntervalMs: 1 });
+  p.setBeats([beat("1", "A"), beat("2", "B")]);
+  const base = p.intervalMs();
+  p.setSpeed(2);
+  expect(p.intervalMs()).toBeLessThan(base);
+  expect(p.intervalMs()).toBeCloseTo(base / 2, 5);
+});
+
+test("lastAdvanceMs is -1 before first tick, then set", () => {
+  const p = createPlayer({ baseIntervalMs: 1 });
+  p.setBeats([beat("1", "A"), beat("2", "B")]);
+  expect(p.lastAdvanceMs()).toBe(-1);
+  p.tick(500);
+  expect(p.lastAdvanceMs()).toBeGreaterThanOrEqual(0);
+});
