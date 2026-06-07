@@ -247,6 +247,7 @@ export function App({ store }: { store: Store }) {
           panel={panel}
           presented={activePlayer ? activePlayer.presented() : []}
           cursor={cursor}
+          playerTotal={playerTotal}
           infoOn={infoOn}
           lastAdvanceMs={lastAdvanceMs}
           intervalMs={intervalMs}

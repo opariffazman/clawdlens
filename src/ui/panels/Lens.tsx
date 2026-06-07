@@ -9,6 +9,7 @@ import { iconFor } from "../icons";
 interface Props {
   presented: Beat[];
   cursor: number;
+  total: number;
   pulse: boolean;
   lastAdvanceMs: number;
   intervalMs: number;
@@ -81,12 +82,16 @@ function drawHud(buf: OptimizedBuffer, flow: { main: LaneFlow; agentsLive: numbe
   for (let x = LEFT + 1; x < w - 2; x++) { put(buf, x, top, "─", border, w, h); put(buf, x, top + bandH - 1, "─", border, w, h); }
   put(buf, w - 2, top, "┐", border, w, h);
   put(buf, w - 2, top + bandH - 1, "┘", border, w, h);
+  for (let y = top + 1; y < top + bandH - 1; y++) {
+    put(buf, LEFT, y, "│", border, w, h);
+    put(buf, w - 2, y, "│", border, w, h);
+  }
   drawStr(buf, LEFT + 2, top, " NOW ", RGBA.fromHex(theme.accent), w, h);
   const m = flow.main;
   const nowLine = m.activeKind
     ? `${iconFor(m.actionIcon ?? STAGE_ICON[m.activeKind] ?? "tool")} ${m.activeKind}${m.detail ? " · " + m.detail : ""}`
     : "idle";
-  drawStr(buf, LEFT + 2, top + 1, clip(nowLine, w - 5), RGBA.fromHex(m.errored ? theme.err : theme.fg), w, h);
+  drawStr(buf, LEFT + 2, top + 1, clip(nowLine, w - 6), RGBA.fromHex(m.errored ? theme.err : theme.fg), w, h);
   const succTotal = m.ok + m.err;
   const succ = succTotal > 0 ? Math.round((100 * m.ok) / succTotal) : 100;
   const bars = Math.max(0, Math.min(4, Math.round(tempo * 4)));
@@ -111,7 +116,7 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
   put(buf, x + 4, y, glyph, RGBA.fromHex(col), w, h);
 }
 
-export function Lens({ presented, cursor, pulse, lastAdvanceMs, intervalMs, status, width, height }: Props) {
+export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalMs, status, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const idle = status === "idle" || status === "dormant" || status === "waiting";
   const animating = pulse && !idle;
@@ -178,7 +183,7 @@ export function Lens({ presented, cursor, pulse, lastAdvanceMs, intervalMs, stat
           flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
         }
 
-        drawHud(buffer, flow, status, tempo, presented.length, cursor, width, height);
+        drawHud(buffer, flow, status, tempo, total, cursor, width, height);
       }}
     />
   );
