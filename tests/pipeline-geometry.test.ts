@@ -38,3 +38,16 @@ test("cardWire different-row produces a connected L-path", () => {
   expect(cells.length).toBeGreaterThan(0);
   expect(cells.some((c) => c.y > a.y + a.h - 1)).toBe(true);
 });
+
+test("cardWire same-row back-arc produces an arc below the cards", () => {
+  const a = coarseCardRect("result");  // right card
+  const b = coarseCardRect("think");   // left card, same row (b.x < a.x)
+  const cells = cardWire(a, b);
+  expect(cells.length).toBeGreaterThan(0);
+  const yArc = a.y + a.h; // one row below the card bottom
+  expect(cells.every((c) => c.y === yArc)).toBe(true);
+  expect(cells.some((c) => c.ch === "╮")).toBe(true);
+  expect(cells.some((c) => c.ch === "╭")).toBe(true);
+  const xs = cells.map((c) => c.x);
+  expect(Math.min(...xs)).toBeLessThan(Math.max(...xs));
+});
