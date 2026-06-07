@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { PANELS, DEFAULT_PANEL } from "../src/core/types";
-import { fuzzyScore, hintsFor, tabModel, tabBarCells } from "../src/core/chrome";
+import { fuzzyScore, hintsFor, tabModel, tabBarCells, menuWindow } from "../src/core/chrome";
 
 test("PANELS order: lens first, log last", () => {
   expect(PANELS).toEqual(["lens", "files", "tasks", "git", "log"]);
@@ -94,4 +94,25 @@ test("tabBarCells: inactive labels render in order on row 0", () => {
 test("tabBarCells: every cell is within width", () => {
   const cells = tabBarCells(tabModel(["lens", "files", "tasks", "git", "log"], "git"), 30);
   for (const c of cells) { expect(c.x).toBeGreaterThanOrEqual(0); expect(c.x).toBeLessThan(30); }
+});
+
+test("menuWindow: short list fits, no overflow", () => {
+  const w = menuWindow(3, 0, 10);
+  expect(w).toEqual({ start: 0, count: 3, selected: 0, more: 0 });
+});
+
+test("menuWindow: long list centers around index and reports more", () => {
+  const w = menuWindow(100, 50, 10);
+  expect(w.count).toBe(10);
+  expect(w.start).toBeLessThanOrEqual(50);
+  expect(w.start + w.count).toBeGreaterThan(50);
+  expect(w.selected).toBe(50 - w.start);
+  expect(w.more).toBe(100 - (w.start + w.count));
+});
+
+test("menuWindow: clamps at the end", () => {
+  const w = menuWindow(100, 99, 10);
+  expect(w.start).toBe(90);
+  expect(w.count).toBe(10);
+  expect(w.more).toBe(0);
 });

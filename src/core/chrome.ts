@@ -111,3 +111,12 @@ export function tabBarCells(tabs: TabSeg[], width: number): TabCell[] {
   for (let i = 0; i < width; i++) push(i, 1, rule[i]!, "border");
   return cells;
 }
+
+export interface MenuWindow { start: number; count: number; selected: number; more: number }
+
+export function menuWindow(total: number, index: number, rows: number): MenuWindow {
+  const r = Math.max(1, rows);
+  const start = Math.max(0, Math.min(index - Math.floor(r / 2), Math.max(0, total - r)));
+  const count = Math.min(r, total - start);
+  return { start, count, selected: index - start, more: Math.max(0, total - (start + count)) };
+}
