@@ -1,5 +1,5 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
-import { buildPipeline, type PipeKind } from "../../core/pipeline";
+import { buildPipeline, edgeVisible, type PipeKind } from "../../core/pipeline";
 import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
 import { nodePos, edgePath, LEFT, TOP, COL_GAP, STAGE_ROW_H } from "../../core/pipeline-geometry";
 import type { Beat, IconKey, SessionState, Status } from "../../core/types";
@@ -128,6 +128,13 @@ export function Lens({ full, presented, cursor, pulse, lastAdvanceMs, intervalMs
         const now = Date.now();
         const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(0.4, (600 / intervalMs) * 0.2)) : 0;
+
+        // 0. dim backbone: connect present stages (node labels are drawn on top next)
+        for (const e of graph.edges) {
+          if (!edgeVisible(e.weight, graph.maxWeight)) continue;
+          if (!present.has(e.from) || !present.has(e.to)) continue;
+          for (const c of edgePath(e.from, e.to)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+        }
 
         // 1. dim backdrop: every present stage + its count
         for (const kind of present) {
