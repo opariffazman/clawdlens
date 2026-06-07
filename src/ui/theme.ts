@@ -1,3 +1,5 @@
+import { RGBA } from "@opentui/core";
+
 export const theme = {
   accent: "#00E5FF",
   dim: "#5A6472",
@@ -12,3 +14,5 @@ export const theme = {
   panel: "#11151C",
   sel: "#1C2230",
 };
+
+export const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0);
