@@ -93,10 +93,6 @@ export function App({ store }: { store: Store }) {
   useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, infoOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
-  const stepSel = (dir: number) => {
-    const i = sessions.findIndex((s) => s.id === selected?.id);
-    switchTo(sessions[Math.max(0, Math.min(sessions.length - 1, (i < 0 ? 0 : i) + dir))]?.id ?? null);
-  };
 
   const runCommand = (id: string) => {
     switch (id) {
@@ -107,13 +103,6 @@ export function App({ store }: { store: Store }) {
       case "panel.log": setPanel("log"); break;
       case "nav.sessions": setPicker({ open: true, stage: "projects", project: null, index: 0 }); break;
       case "view.help": setShowHelp(true); break;
-      case "view.rescan":
-        store.pollOnce(Date.now());
-        if (selected && (panel === "lens" || panel === "files" || panel === "tasks" || panel === "git")) {
-          const fs = store.fullSession(selected.id); setFull(fs);
-          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
-        }
-        break;
       case "play.pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
       case "play.replay": {
         if (replay.player) { setReplay({ player: null }); break; }
@@ -123,8 +112,6 @@ export function App({ store }: { store: Store }) {
         setReplay({ player: rp });
         break;
       }
-      case "play.loop": if (replay.player) { replay.player.setLoop(!replay.player.isLoop()); setReplay({ player: replay.player }); } break;
-      case "view.pulse": setPulse((p) => !p); break;
       case "files.sort": setFilesSort((s) => (s === "edits" ? "reads" : s === "reads" ? "recent" : "edits")); break;
       case "git.scope": setGitScope((s) => (s === "all" ? "branch" : "all")); break;
       case "tasks.hideDone": setTasksHideDone((v) => !v); break;
@@ -180,31 +167,15 @@ export function App({ store }: { store: Store }) {
     if (!action) return;
     switch (action.type) {
       case "quit": renderer.destroy(); break;
-      case "sess-down": stepSel(1); break;
-      case "sess-up": stepSel(-1); break;
-      case "jump": switchTo(sessions[Math.min(sessions.length - 1, action.n - 1)]?.id ?? null); break;
       case "panel-next": setPanel((p) => PANELS[(PANELS.indexOf(p) + 1) % PANELS.length]!); break;
       case "panel-prev": setPanel((p) => PANELS[(PANELS.indexOf(p) + PANELS.length - 1) % PANELS.length]!); break;
       case "beat-back": activePlayer?.stepBack(); break;
-      case "beat-fwd": activePlayer?.stepForward(); break;
-      case "chunk-back": for (let i = 0; i < 10; i++) activePlayer?.stepBack(); break;
-      case "chunk-fwd": for (let i = 0; i < 10; i++) activePlayer?.stepForward(); break;
-      case "to-start": activePlayer?.toStart(); break;
-      case "to-live": activePlayer?.toLive(); break;
+      case "beat-fwd": activePlayer?.stepForward(); break; // stepForward snaps to live at head (player.ts:76)
       case "pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
       case "speed-up": activePlayer?.setSpeed((activePlayer.speed() || 1) * 1.5); break;
       case "speed-down": activePlayer?.setSpeed((activePlayer.speed() || 1) / 1.5); break;
-      case "pulse": setPulse((p) => !p); break;
-      case "lens": setLensOn((v) => !v); break;
       case "info": setInfoOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
-      case "rescan":
-        store.pollOnce(Date.now());
-        if (selected && (panel === "lens" || panel === "files" || panel === "tasks" || panel === "git")) {
-          const fs = store.fullSession(selected.id); setFull(fs);
-          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
-        }
-        break;
       case "replay": {
         if (replay.player) { setReplay({ player: null }); break; }
         if (!selected) break;
@@ -213,7 +184,6 @@ export function App({ store }: { store: Store }) {
         setReplay({ player: rp });
         break;
       }
-      case "loop": if (replay.player) { replay.player.setLoop(!replay.player.isLoop()); setReplay({ player: replay.player }); } break;
     }
   });
 
