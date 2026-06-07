@@ -29,3 +29,38 @@ export function fuzzyScore(query: string, target: string): number | null {
   }
   return score;
 }
+
+import type { PanelId } from "./types";
+
+export interface Hint { key: string; label: string }
+
+const GLOBAL_HINTS: Hint[] = [
+  { key: ":", label: "cmd" },
+  { key: "Tab", label: "cycle" },
+  { key: "h/l", label: "scrub" },
+  { key: "space", label: "pause" },
+  { key: "?", label: "help" },
+  { key: "q", label: "quit" },
+];
+
+const PANEL_HINTS: Record<PanelId, Hint[]> = {
+  lens: [],
+  log: [{ key: "[ ]", label: "chunk" }, { key: "p", label: "pulse" }],
+  files: [{ key: ":sort", label: "sort" }],
+  git: [{ key: ":scope", label: "scope" }],
+  tasks: [{ key: ":hide-done", label: "hide done" }],
+};
+
+export function hintsFor(panel: PanelId): Hint[] {
+  return [...GLOBAL_HINTS, ...PANEL_HINTS[panel]];
+}
+
+export interface TabSeg { id: PanelId; label: string; active: boolean }
+
+const TAB_LABELS: Record<PanelId, string> = {
+  lens: "Lens", files: "Files", tasks: "Tasks", git: "Git", log: "Log",
+};
+
+export function tabModel(panels: PanelId[], active: PanelId): TabSeg[] {
+  return panels.map((id) => ({ id, label: TAB_LABELS[id], active: id === active }));
+}
