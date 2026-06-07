@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useKeyboard, useRenderer } from "@opentui/react";
 import { RGBA } from "@opentui/core";
 import type { createStore } from "../store/sessionStore";
@@ -32,6 +32,15 @@ export function App({ store }: { store: Store }) {
 
   useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
   useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
+  // Multiplexers (tmux) compute some glyph widths differently than OpenTUI's
+  // detected width method. The incremental diff then mis-tracks the cursor and
+  // leaves stale "ghost" cells when text scrolls/scrubs. Re-emitting the whole
+  // frame (full repaint) overwrites them — this is what tmux detach/reattach or
+  // a resize does. Trigger it whenever content moves.
+  const forceRepaint = useCallback(() => {
+    (renderer as unknown as { forceFullRepaintRequested?: boolean }).forceFullRepaintRequested = true;
+    renderer.requestRender();
+  }, [renderer]);
   useEffect(() => {
     const onResize = (cols: number, rows: number) => setSize({ w: cols, h: rows });
     renderer.on("resize", onResize);
@@ -62,7 +71,17 @@ export function App({ store }: { store: Store }) {
   const activePlayer = replay.player ?? player;
   // one shared timeline: all panels reveal in sync with the active player's cursor
   const playerTotal = activePlayer ? activePlayer.all().length : 0;
-  const progress = activePlayer && playerTotal > 0 ? activePlayer.cursor() / playerTotal : 1;
+  const cursor = activePlayer ? activePlayer.cursor() : 0;
+  const progress = activePlayer && playerTotal > 0 ? cursor / playerTotal : 1;
+
+  // Force a full repaint whenever the scroll position or layout changes — the
+  // moments stale ghost cells form. Pulse-only frames (cursor unchanged) keep
+  // the cheap incremental diff. See forceRepaint above for why.
+  const prevCursor = useRef(-1);
+  useEffect(() => {
+    if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
+  });
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, showHelp, pulse, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
   const stepSel = (dir: number) => {
@@ -155,7 +174,7 @@ export function App({ store }: { store: Store }) {
         session={selected}
         panel={panel}
         presented={activePlayer ? activePlayer.presented() : []}
-        cursor={activePlayer ? activePlayer.cursor() : 0}
+        cursor={cursor}
         pulse={pulse}
         lensOn={lensOn}
         marker={marker}

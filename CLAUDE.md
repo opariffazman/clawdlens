@@ -1,6 +1,6 @@
 # harness-flow
 
-Terminal glass box for Claude Code sessions. Passive observer — tails `~/.claude/projects/**/*.jsonl`, no hooks, no setup. Shows what each session doing: animated metro **Flow** + energy-pulse, file heatmap, agnostic tasks, git commit-graph, superpowers phase lens. OpenTUI + React on Bun.
+Terminal glass box for Claude Code sessions. Passive observer — tails `~/.claude/projects/**/*.jsonl`, no hooks, no setup. Shows each session activity: animated metro **Flow** + energy-pulse, file heatmap, agnostic tasks, git commit-graph, superpowers phase lens. OpenTUI + React on Bun.
 
 ## Run
 
@@ -55,7 +55,7 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 
 - **Beat** = one narrative event (thinking/text/tool/skill/result). `iconKey` semantic; glyph resolved in UI (icons.ts).
 - **Player cursor = ONE shared timeline.** `progress = activePlayer.cursor()/all().length` drives ALL panels (Flow/Files/Tasks/Git) — reveal in sync, finish together. Not per-panel timers.
-- **Adaptive cadence** (live AND replay): `interval = max(min, base*factor)/speed`; factor eases as it catches up; `+`/`-` scale whole interval via `/speed`.
+- **Adaptive cadence** (live AND replay): `interval = max(min, base*factor)/speed`; factor eases as catches up; `+`/`-` scale whole interval via `/speed`.
 - **Backfill vs full-fold.** Live store tails from EOF + ~64KB backfill (recent only). Aggregate panels (Files/Tasks/git cwd) use `store.fullSession()` = whole transcript.
 - **Lens** = superpowers phases from skill attribution + spec/plan file writes.
 - **Agnostic tasks**: reducer reconstructs from harness TaskCreate(subject)/TaskUpdate(taskId,status) sequentially, plus TodoWrite.
@@ -66,14 +66,17 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 
 ## Conventions
 
+- **Use superpowers skills whenever relevant** (not optional): `brainstorming` before any new feature/behaviour; `systematic-debugging` for ANY bug/test-failure/unexpected behaviour (root cause before fix — no guess-and-check); `test-driven-development` before impl; `writing-plans`/`executing-plans` for multi-step work; `verification-before-completion` before claiming done. Invoke via the `Skill` tool.
+- **Use the `opentui` skill for ANY OpenTUI work** (rendering, buffers, layout, keymaps, capabilities) — its `docs/**/*.mdx` are source of truth; don't guess the API.
 - **TDD pure core** — failing test first. Workflow: brainstorm → spec → plan → subagent-driven build. specs/plans in `docs/superpowers/`.
-- **Verify TUI visually via tmux** (agent has no TTY): `tmux new-session -d -s hf -x 150 -y 36 "bun run dev"; sleep 4; tmux capture-pane -t hf -p`. Use `-e` + diff two frames to see colour/pulse animation. `tmux send-keys` to drive keys.
+- **Verify TUI visually via tmux** (agent has no TTY): `tmux new-session -d -s hf -x 150 -y 36 "bun run dev"; sleep 4; tmux capture-pane -t hf -p`. Use `-e` + diff two frames for colour/pulse animation. `tmux send-keys` to drive keys.
 - **Transparent canvas** — inherit terminal bg (OLED). Don't paint bg except selection/overlay accents.
 - Conventional commits, per task. Solo local repo, no remote → commit direct to main.
 
 ## Gotchas
 
-- OpenTUI buffered panels (Flow/Git): draw via `buffer.setCell(x,y,ch,fg,bg)` + `RGBA.fromHex`/`fromValues`. Set box `live={animating}` for the continuous pulse — `renderer.targetFps` alone does NOT run the loop. `drawStr` = setCell loop, assumes 1 cell/char → wide/emoji glyphs misalign.
+- OpenTUI buffered panels (Flow/Git): draw via `buffer.setCell(x,y,ch,fg,bg)` + `RGBA.fromHex`/`fromValues`. Set box `live={animating}` for continuous pulse — `renderer.targetFps` alone does NOT run loop. `drawStr` = setCell loop, assumes 1 cell/char → wide/emoji glyphs misalign.
+- **tmux ghosting (stale cells when scrolling).** Symptom: scrubbing leaves leftover text fragments at fixed columns; `tmux detach`/reattach or resize clears them; never reproduces outside tmux. Root cause: OpenTUI auto-detects width method (`caps.unicode` → `"unicode"` inside tmux) that DISAGREES with how tmux advances cursor for some glyphs (emoji/CJK/ambiguous, e.g. `⏪`=2 but `⏮`=1). Incremental render diff then mis-tracks cursor, skips re-emitting drifted cells. NOT transparency (opaque bg doesn't fix), NOT one glyph (even ASCII-only content ghosts). Width method native-only — can't force `wcwidth` from JS. **Fix:** force full repaint (`renderer.forceFullRepaintRequested = true; renderer.requestRender()`) whenever content moves (cursor/panel/session/picker change) — re-emits every cell, overwrites drift. See `App.tsx` `forceRepaint`.
 - tsconfig needs `"jsxImportSource": "@opentui/react"`.
 - Write tool sometimes strips PUA glyphs — verify Nerd Font codepoints by hex.
 - ctx% can read >100% for 1M-context models (transcript `message.model` omits `[1m]`); effectiveContextLimit infers from observed ctx.
