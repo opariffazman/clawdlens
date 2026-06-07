@@ -1,6 +1,6 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
-import { coarseCardRect, cardWire, type Rect, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
+import { coarseCardRect, fineCardLayout, cardWire, type Rect, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
 import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
@@ -25,7 +25,10 @@ const COARSE_STAGES = ["think", "tool", "result", "chat"];
 const STAGE_ICON: Record<string, IconKey> = { think: "thinking", tool: "tool", skill: "skill", result: "result", chat: "text" };
 const STAGE_COL: Record<string, number> = { think: 0, tool: 1, skill: 1, result: 2, chat: 3 };
 
-function laneHexOf(kind: string) { return theme.laneColors[(STAGE_COL[kind] ?? 0) % theme.laneColors.length]!; }
+function laneHexOf(kind: string) {
+  const col = STAGE_COL[kind] ?? (kind.charCodeAt(0) % theme.laneColors.length);
+  return theme.laneColors[col % theme.laneColors.length]!;
+}
 function clip(s: string, n: number) { return s.length > n ? s.slice(0, Math.max(0, n - 1)) + "…" : s; }
 function statusHex(s: Status) {
   return s === "error" ? theme.err : s === "waiting" ? theme.warn
@@ -116,16 +119,28 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
   put(buf, x + 4, y, glyph, RGBA.fromHex(col), w, h);
 }
 
-export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalMs, status, width, height }: Props) {
-  const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
+export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
+  const grain = infoOn ? "fine" : "coarse";
+  const flow = deriveFlow(presented, cursor, TRAIL_HOPS, grain);
   const idle = status === "idle" || status === "dormant" || status === "waiting";
   const animating = pulse && !idle;
 
-  const presentKinds = [...COARSE_STAGES];
-  if ((flow.main.counts["skill"] ?? 0) > 0) presentKinds.push("skill");
-  const layout = new Map<string, Rect>(presentKinds.map((k) => [k, coarseCardRect(k as Parameters<typeof coarseCardRect>[0])]));
-  const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
-  if (presentKinds.includes("skill")) backbone.push(["tool", "skill"]);
+  let presentKinds: string[];
+  let layout: Map<string, Rect>;
+  let backbone: [string, string][];
+  if (grain === "coarse") {
+    presentKinds = [...COARSE_STAGES];
+    if ((flow.main.counts["skill"] ?? 0) > 0) presentKinds.push("skill");
+    layout = new Map(presentKinds.map((k) => [k, coarseCardRect(k as Parameters<typeof coarseCardRect>[0])]));
+    backbone = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
+    if (presentKinds.includes("skill")) backbone.push(["tool", "skill"]);
+  } else {
+    // fine: a card per node that has fired (incl. synthetic result). No dense
+    // static backbone — the live comet/trail carries the flow across the strip.
+    presentKinds = Object.keys(flow.main.counts);
+    layout = fineCardLayout(presentKinds, width);
+    backbone = [];
+  }
 
   return (
     <box
@@ -165,7 +180,8 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
           const active = k === flow.main.activeKind;
           const laneHex = laneHexOf(k);
           const border = RGBA.fromHex(active ? (flow.main.errored ? theme.err : (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex)) : theme.dim);
-          const icon = iconFor(active ? (flow.main.actionIcon ?? STAGE_ICON[k] ?? "tool") : (STAGE_ICON[k] ?? "tool"));
+          const idleIcon = (STAGE_ICON[k] ?? k) as IconKey; // coarse stage icon, else the fine kind is itself an IconKey
+          const icon = iconFor(active ? (flow.main.actionIcon ?? idleIcon) : idleIcon);
           const content = k === "result" ? `✓${flow.main.ok} ✗${flow.main.err}` : `×${flow.main.counts[k] ?? 0}`;
           drawCard(buffer, r, icon, k, content, RGBA.fromHex(active ? theme.fg : theme.dim), border, active, width, height);
         }
