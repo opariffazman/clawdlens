@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { spinnerFrame, pulseIntensity, lerpHex, pulsePhase, cometColor } from "../src/ui/anim";
+import { spinnerFrame, pulseIntensity, lerpHex, pulsePhase, cometColor, breathe } from "../src/ui/anim";
 
 test("spinnerFrame cycles", () => {
   const a = spinnerFrame(0);
@@ -42,4 +42,13 @@ test("cometColor: hot head, dim tail-end, floor preserved", () => {
   const mid = cometColor(3, 7, lane, hot, dim);
   expect(mid).not.toBe(dim);
   expect(mid).not.toBe("#f2fbff");
+});
+
+test("breathe stays within [0.6,1] and repeats by period", () => {
+  for (const t of [0, 200, 450, 900, 1800]) {
+    const v = breathe(t, 1800);
+    expect(v).toBeGreaterThanOrEqual(0.6 - 1e-9);
+    expect(v).toBeLessThanOrEqual(1 + 1e-9);
+  }
+  expect(breathe(0, 1800)).toBeCloseTo(breathe(1800, 1800), 5); // one full period
 });

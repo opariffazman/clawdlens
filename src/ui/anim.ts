@@ -49,3 +49,9 @@ export function cometColor(
   const base = lerpHex(dimHex, laneHex, laneAmt);
   return lerpHex(base, hotHex, t * t);
 }
+
+// slow sine brightness for the parked head, mapped to [0.6, 1.0].
+export function breathe(now: number, periodMs = 1800): number {
+  const s = 0.5 + 0.5 * Math.sin((2 * Math.PI * now) / periodMs);
+  return 0.6 + 0.4 * s;
+}
