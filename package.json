@@ -1,13 +1,49 @@
 {
-  "name": "harness-flow",
+  "name": "clawdlens",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
+  "description": "Terminal glass box for Claude Code sessions — live flow, status, files, tasks, git, and a superpowers phase lens. Passive observer, zero setup.",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "tui",
+    "terminal",
+    "opentui",
+    "bun",
+    "observability",
+    "monitor",
+    "devtools"
+  ],
+  "license": "MIT",
+  "author": "opariffazman",
+  "homepage": "https://github.com/opariffazman/clawdlens#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opariffazman/clawdlens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/opariffazman/clawdlens/issues"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  },
   "module": "src/index.tsx",
+  "bin": {
+    "clawdlens": "bin/clawdlens.ts"
+  },
+  "files": [
+    "src",
+    "bin",
+    "tsconfig.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "dev": "bun run src/index.tsx",
+    "dump": "bun run bin/clawdlens-dump.ts",
     "test": "bun test",
-    "dump": "bun run bin/hf-dump.ts",
-    "dev": "bun run src/index.tsx"
+    "typecheck": "bunx tsc --noEmit"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

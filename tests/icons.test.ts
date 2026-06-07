@@ -1,13 +1,31 @@
-import { test, expect } from "bun:test";
-import { iconFor, ICONS_UNICODE, ICONS_NERD } from "../src/ui/icons";
+import { afterEach, describe, expect, test } from "bun:test";
+import { activeIconSet, ICONS_NERD, ICONS_UNICODE, iconFor } from "../src/ui/icons";
+
+describe("activeIconSet", () => {
+  const orig = process.env.CL_ICONS;
+  afterEach(() => {
+    if (orig === undefined) delete process.env.CL_ICONS;
+    else process.env.CL_ICONS = orig;
+  });
+
+  test("defaults to nerd when CL_ICONS is unset", () => {
+    delete process.env.CL_ICONS;
+    expect(activeIconSet()).toBe("nerd");
+  });
+
+  test("returns unicode when CL_ICONS=unicode", () => {
+    process.env.CL_ICONS = "unicode";
+    expect(activeIconSet()).toBe("unicode");
+  });
+});
 
 test("iconFor resolves the active set", () => {
-  // default (no HF_ICONS) is the nerd set
-  delete process.env.HF_ICONS;
+  // default (no CL_ICONS) is the nerd set
+  delete process.env.CL_ICONS;
   expect(iconFor("bash")).toBe(ICONS_NERD.bash);
-  process.env.HF_ICONS = "unicode";
+  process.env.CL_ICONS = "unicode";
   expect(iconFor("bash")).toBe(ICONS_UNICODE.bash);
-  delete process.env.HF_ICONS;
+  delete process.env.CL_ICONS;
 });
 
 test("every IconKey has a glyph in both sets", () => {

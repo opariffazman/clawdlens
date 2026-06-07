@@ -23,7 +23,7 @@ export const ICONS_NERD: Record<IconKey, string> = {
 };
 
 export function activeIconSet(): IconSet {
-  return process.env.HF_ICONS === "unicode" ? "unicode" : "nerd";
+  return process.env.CL_ICONS === "unicode" ? "unicode" : "nerd";
 }
 export function usePowerline(): boolean {
   return activeIconSet() === "nerd";

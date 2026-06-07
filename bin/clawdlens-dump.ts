@@ -11,7 +11,7 @@ const unsub = store.subscribe(() => {
     return `${s.status.padEnd(8)} ${s.project.padEnd(16)} ctx ${String(ctx).padStart(3)}%  $${s.costUSD.toFixed(2)}${phase}  ${doing}`;
   });
   console.clear();
-  console.log("harness-flow — live sessions\n");
+  console.log("ClawdLens — live sessions\n");
   console.log(lines.join("\n") || "(no sessions yet)");
 });
 
