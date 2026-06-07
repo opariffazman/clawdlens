@@ -68,11 +68,11 @@ export function App({ store }: { store: Store }) {
     if (panel === "files" || panel === "tasks" || panel === "git") {
       const fs = store.fullSession(selected.id);
       setFull(fs);
-      setCommits(panel === "git" && fs?.cwd ? gitLog(fs.cwd) : []);
+      setCommits(panel === "git" && fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
     } else {
       setCommits([]);
     }
-  }, [panel, selected?.id]);
+  }, [panel, selected?.id, gitScope]);
 
   const player = selected ? players.get(selected.id) : null;
   const activePlayer = replay.player ?? player;
@@ -109,7 +109,7 @@ export function App({ store }: { store: Store }) {
         store.pollOnce(Date.now());
         if (selected && (panel === "files" || panel === "tasks" || panel === "git")) {
           const fs = store.fullSession(selected.id); setFull(fs);
-          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd) : []);
+          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
         }
         break;
       case "play.pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
@@ -198,7 +198,7 @@ export function App({ store }: { store: Store }) {
         store.pollOnce(Date.now());
         if (selected && (panel === "files" || panel === "tasks" || panel === "git")) {
           const fs = store.fullSession(selected.id); setFull(fs);
-          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd) : []);
+          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
         }
         break;
       case "replay": {
@@ -246,6 +246,8 @@ export function App({ store }: { store: Store }) {
           commits={commits}
           full={full}
           progress={progress}
+          filesSort={filesSort}
+          tasksHideDone={tasksHideDone}
         />
       )}
       {picker.open && (

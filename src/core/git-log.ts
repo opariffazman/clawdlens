@@ -6,6 +6,7 @@ export const GIT_LOG_ARGS = [
   "log", "--all", "--date-order", "--no-patch",
   `--pretty=format:%H${US}%P${US}%D${US}%s`, "-n", "120",
 ];
+export const GIT_LOG_ARGS_BRANCH = GIT_LOG_ARGS.filter((a) => a !== "--all");
 
 export function parseGitLog(stdout: string): Commit[] {
   const out: Commit[] = [];
