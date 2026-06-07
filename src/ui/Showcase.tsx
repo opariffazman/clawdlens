@@ -1,5 +1,6 @@
 import type { SessionState } from "../core/types";
 import { theme } from "./theme";
+import { TRANSPARENT } from "./theme";
 import { Flow } from "./panels/Flow";
 import { Files } from "./panels/Files";
 import { Tasks } from "./panels/Tasks";
@@ -11,6 +12,7 @@ import { type PanelId, PANELS } from "../core/types";
 export type { PanelId };
 export { PANELS };
 import { Header } from "./Header";
+import { TabBar } from "./TabBar";
 
 interface Props {
   session: SessionState | null;
@@ -38,13 +40,19 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
   // aggregate panels use the full-session fold when available, else the live state
   const agg = full ?? session;
   const tasksLens = lensOn ? agg.lens : { ...agg.lens, lensId: null };
-  // height budget: header(2) + body margin(1) + border(2)
-  const bodyHeight = Math.max(1, height - 5);
+  // height budget: header(2) + tabbar(2) + bottom border(1) + slack = 6
+  const bodyHeight = Math.max(1, height - 6);
   return (
-    <box style={{ flexGrow: 1, border: true, flexDirection: "column", padding: 1 }}>
+    <box style={{ flexGrow: 1, flexDirection: "column", backgroundColor: TRANSPARENT }}>
       <Header session={session} panel={panel} marker={marker} />
-      {/* body — absorbs the slack */}
-      <box style={{ flexGrow: 1, flexShrink: 1, marginTop: 1 }}>
+      <TabBar panels={PANELS} active={panel} lens={lensOn ? session.lens : { ...session.lens, lensId: null }} width={width} />
+      <box
+        style={{
+          flexGrow: 1, flexShrink: 1,
+          border: ["left", "right", "bottom"], borderStyle: "rounded", borderColor: theme.accent,
+          paddingLeft: 1, paddingRight: 1, backgroundColor: TRANSPARENT,
+        }}
+      >
         {panel === "lens" && <Lens />}
         {panel === "log" && <Flow beats={presented} cursor={cursor} pulse={pulse} width={width - 4} height={bodyHeight} />}
         {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} />}
