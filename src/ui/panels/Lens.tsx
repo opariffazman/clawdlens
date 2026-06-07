@@ -1,6 +1,7 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
-import { coarseCardRect, pipeForward, pipeReturn, pipeBranch, type Rect, type Cell, LEFT, TOP, CARD_H } from "../../core/pipeline-geometry";
+import { coarseCardRect, pipeForward, pipeReturn, pipeBranch, expandStack, type Rect, type Cell, LEFT, TOP, CARD_H } from "../../core/pipeline-geometry";
+import { rankOf } from "../../core/pipeline";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
 import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
@@ -21,6 +22,7 @@ interface Props {
 
 const TRAIL_HOPS = 3;
 const TAIL = 6;
+const MAX_CHILDREN = 6;
 const COARSE_STAGES = ["think", "tool", "result", "chat"];
 const STAGE_ICON: Record<string, IconKey> = { think: "thinking", tool: "tool", skill: "skill", result: "result", chat: "text" };
 const STAGE_COL: Record<string, number> = { think: 0, tool: 1, skill: 1, result: 2, chat: 3 };
@@ -134,6 +136,13 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
   const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
   if (showSkill) backbone.push(["tool", "skill"]);
 
+  // tool vertical expansion (i): per-action child cards stacked under the tool card
+  const toolRect = layout.get("tool")!;
+  const childKinds = infoOn
+    ? Object.keys(flow.main.toolBreakdown).sort((a, b) => rankOf(a) - rankOf(b)).slice(0, MAX_CHILDREN)
+    : [];
+  const childRects = expandStack(toolRect, childKinds.length);
+
   return (
     <box
       style={{ width, height, backgroundColor: TRANSPARENT }}
@@ -145,13 +154,20 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
         const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
 
+        // when expansion is active, block y-range so U-return wire doesn't overdraw child rows
+        const expandMinY = childRects.length > 0 ? (childRects[0]!.y) : Infinity;
+        const expandMaxY = childRects.length > 0 ? (childRects[childRects.length - 1]!.y) : -Infinity;
+        const inExpand = (y: number) => childKinds.length > 0 && y >= expandMinY && y <= expandMaxY;
+
         for (const [a, b] of backbone) {
-          for (const c of wireFor(a, b, layout, channelY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          for (const c of wireFor(a, b, layout, channelY)) {
+            if (!inExpand(c.y)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          }
         }
 
         const trail = flow.main.trail;
         for (let i = 0; i + 1 < trail.length; i++) {
-          const cells = wireFor(trail[i]!, trail[i + 1]!, layout, channelY);
+          const cells = wireFor(trail[i]!, trail[i + 1]!, layout, channelY).filter((c) => !inExpand(c.y));
           if (cells.length === 0) continue;
           const laneHex = laneHexOf(trail[i + 1]!);
           if (i === trail.length - 2 && animating) {
@@ -173,6 +189,20 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
           drawCard(buffer, r, icon, k, content, RGBA.fromHex(active ? theme.fg : theme.dim), border, active, width, height);
         }
 
+        // tool vertical expansion
+        if (childKinds.length > 0) {
+          for (const c of pipeBranch(toolRect, childRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          childKinds.forEach((k, i) => {
+            const r = childRects[i]!;
+            const activeChild = k === flow.main.activeTool;
+            const laneHex = laneHexOf("tool");
+            const fg = RGBA.fromHex(activeChild ? (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : theme.fg) : theme.dim);
+            drawStr(buffer, r.x, r.y, clip(`${iconFor(k as IconKey)} ${k} ×${flow.main.toolBreakdown[k] ?? 0}`, width - r.x - 2), fg, width, height);
+          });
+          const extra = Object.keys(flow.main.toolBreakdown).length - childKinds.length;
+          if (extra > 0) drawStr(buffer, toolRect.x + 4, (childRects[childRects.length - 1]?.y ?? toolRect.y + toolRect.h) + 1, `+${extra} more`, RGBA.fromHex(theme.dim), width, height);
+        }
+
         const ak = flow.main.activeKind;
         if (flow.main.milestone && ak && layout.has(ak) && !(flow.main.milestone === "commit" && flow.main.errored)) {
           const r = layout.get(ak)!;
@@ -180,7 +210,8 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
         }
 
         const bottoms = [...layout.values()].map((r) => r.y + r.h);
-        let sy = Math.max(channelY + 1, ...bottoms) + 1;
+        const childBottom = childRects.length > 0 ? childRects[childRects.length - 1]!.y + 2 : 0;
+        let sy = Math.max(channelY + 1, childBottom, ...bottoms) + 1;
         if (flow.agentsLive > 0) {
           drawStr(buffer, LEFT, sy, `▸ ${flow.agentsLive} agent${flow.agentsLive > 1 ? "s" : ""} live`, RGBA.fromHex(theme.accent), width, height);
           sy += 1;
