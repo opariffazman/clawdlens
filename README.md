@@ -1,47 +1,73 @@
-# harness-flow
+# ClawdLens
 
-Terminal glass box for Claude Code sessions. Passively watches every running
-session's transcript and shows — at a calm, slow-burn pace — what each one is
-doing: an animated vertical-metro Flow of its actions, status, token/cost/context
-gauge, file heatmap, todos, and a superpowers workflow phase ribbon. Switch
-sessions instantly; scrub history; never leave the terminal.
+[![CI](https://github.com/opariffazman/clawdlens/actions/workflows/ci.yml/badge.svg)](https://github.com/opariffazman/clawdlens/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/clawdlens.svg)](https://www.npmjs.com/package/clawdlens)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Run
+Terminal glass box for your Claude Code sessions. A passive observer that tails
+`~/.claude/projects/**/*.jsonl` and shows — at a calm, slow-burn pace — what every
+running session is doing: an animated metro **Flow** of its actions, live status, a
+token/cost/context gauge, a file heatmap, an agnostic task list, a git commit-graph,
+and a superpowers workflow **phase lens**. Zero setup. No hooks. Never leave the
+terminal.
+
+## Install
+
+Requires [Bun](https://bun.sh) ≥ 1.3.
 
 ```bash
-bun install
-bun run dev      # the TUI
-bun run dump     # headless debug view
-bun test         # the engine test suite
+bunx clawdlens                          # run without installing
+# or install the command globally:
+bun install -g clawdlens && clawdlens
+```
+
+Run from source instead:
+
+```bash
+git clone https://github.com/opariffazman/clawdlens
+cd clawdlens && bun install
+bun run dev
 ```
 
 ## Fonts
 
-harness-flow uses [Nerd Font](https://www.nerdfonts.com/) glyphs and powerline
-separators for its icons by default. For them to render, install a Nerd Font and
-set it as your terminal font:
+ClawdLens uses [Nerd Font](https://www.nerdfonts.com/) glyphs and powerline
+separators by default. Install one and set it as your terminal font:
 
-- macOS: `brew install --cask font-jetbrains-mono-nerd-font` (or FiraCode/Hack Nerd Font)
-- Linux: download from https://www.nerdfonts.com/font-downloads and install, then select it in your terminal
+- macOS: `brew install --cask font-jetbrains-mono-nerd-font`
+- Linux: download from <https://www.nerdfonts.com/font-downloads> and select it in
+  your terminal
 
-No Nerd Font? Run with the plain-Unicode icon set instead:
+No Nerd Font? Use the plain-Unicode icon set:
 
 ```bash
-HF_ICONS=unicode bun run dev
+CL_ICONS=unicode clawdlens
 ```
 
 ## Keys
 
-`j/k` sessions · `Tab` panels · `h/l` scrub timeline · `g/G` start/live ·
-`space` pause · `+/-` speed · `p` energy-pulse · `w` lens · `r` rescan · `?` help · `q` quit.
+`:` session picker · `Tab`/`Shift-Tab` panels · `h`/`l` or `←`/`→` scrub ·
+`[` `]` chunk · `g`/`G` start/live · `space` pause · `+`/`-` speed · `p` energy-pulse ·
+`w` lens · `R` replay · `L` loop · `r` rescan · `?` help · `q` quit.
 
 ## How it works
 
-Zero setup, no hooks: it tails `~/.claude/projects/**/*.jsonl`. See
-`docs/superpowers/specs/2026-06-06-harness-flow-design.md` for the design and
-its honest limitations (e.g. permission-prompt blocking shows as `running`;
-cost is an estimate).
+ClawdLens is a passive reader. It tails the JSONL transcripts Claude Code writes to
+`~/.claude/projects/**/*.jsonl`, folds them through a pure core
+(`discover → tailer → parse → reducer → store`), and renders the result with
+[OpenTUI](https://github.com/sst/opentui). It never writes to your sessions and
+installs no hooks. See
+[`docs/superpowers/specs/2026-06-06-harness-flow-design.md`](docs/superpowers/specs/2026-06-06-harness-flow-design.md)
+for the original design.
 
-## Known limitations
+## Limitations
 
-- context % can read above 100% for sessions using a 1M-context model, because the transcript's model field does not encode the `[1m]` variant (the gauge bar itself clamps).
+- A permission prompt that blocks a session is indistinguishable from `running` via
+  the transcript alone (no hooks), so it shows as `running`.
+- Cost is an estimate.
+- Context % can read above 100% for sessions on a 1M-context model — the transcript's
+  model field omits the `[1m]` variant — though the gauge bar itself clamps.
+
+## License
+
+[MIT](LICENSE) © 2026 opariffazman
