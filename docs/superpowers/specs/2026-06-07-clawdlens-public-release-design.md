@@ -146,9 +146,9 @@ Notes:
   reached EOL 2026-04-30). Same v6/node24 pinning rationale as CI above.
 - `--access public` is explicit/harmless for the unscoped public package.
 - `gh release create --generate-notes` builds release notes from commits/PRs.
-- **Prereq:** `NPM_TOKEN` repo secret must be set (Automation token from npmjs).
-  Documented in README/CLAUDE.md runbook; the workflow file is otherwise inert
-  until a `v*` tag is pushed.
+- **Prereq:** `NPM_TOKEN` repo secret — **already set** on `opariffazman/clawdlens`
+  (2026-06-07). Token also kept in a local gitignored `.env` (`export NPM_TOKEN=…`)
+  for manual publish if ever needed. Workflow is inert until a `v*` tag is pushed.
 
 ### 5. README rewrite (normal-concise)
 
@@ -220,7 +220,7 @@ Steps 2–4 are independent of each other and can be parallel subagents after st
 ## Release runbook (post-merge, documented in CLAUDE.md)
 
 One-time: create npm **Automation** access token → add as `NPM_TOKEN` repo secret
-(`gh secret set NPM_TOKEN`). Then per release:
+(`gh secret set NPM_TOKEN`). **Done 2026-06-07.** Then per release:
 
 ```bash
 # bump version in package.json (e.g. 0.1.0 -> 0.1.1)
@@ -232,7 +232,7 @@ git push --follow-tags          # triggers Release workflow → npm + GitHub Rel
 ## Open risks
 
 - **npm name** `clawdlens` confirmed free (404 on `npm view`) as of 2026-06-07.
-- **`NPM_TOKEN` secret** not yet set — Release workflow will fail at publish until
-  added. Surfaced in runbook; not a blocker for merge.
+- **`NPM_TOKEN` secret** — **resolved**: set on the repo 2026-06-07; local `.env`
+  gitignored. No longer a blocker.
 - **Provenance** requires the publish to run from the GitHub-hosted workflow with
   `id-token: write` — satisfied by release.yml.
