@@ -67,7 +67,7 @@ export function Showcase({ session, panel, presented, cursor, lastAdvanceMs, int
         {panel === "log" && <Flow beats={presented} cursor={cursor} pulse={pulse} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} width={width - 4} height={bodyHeight} />}
         {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} sort={filesSort} />}
         {panel === "tasks" && <Tasks todos={agg.todos} lens={tasksLens} height={bodyHeight} progress={progress} hideDone={tasksHideDone} />}
-        {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} progress={progress} />}
+        {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} progress={progress} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} />}
       </box>
     </box>
   );
