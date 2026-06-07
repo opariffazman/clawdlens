@@ -1,59 +1,40 @@
 import { test, expect } from "bun:test";
-import { nodePos, edgePath, LEFT, TOP, COL_GAP } from "../src/core/pipeline-geometry";
+import { coarseCardRect, fineCardLayout, cardWire, CARD_W, LEFT, TOP } from "../src/core/pipeline-geometry";
 
-test("nodePos places stages on fixed slots", () => {
-  expect(nodePos("think")).toEqual({ x: LEFT, y: TOP });
-  expect(nodePos("tool")).toEqual({ x: LEFT + COL_GAP, y: TOP });
-  expect(nodePos("result")).toEqual({ x: LEFT + 2 * COL_GAP, y: TOP });
-  expect(nodePos("chat")).toEqual({ x: LEFT + 3 * COL_GAP, y: TOP });
-  expect(nodePos("skill").x).toBe(LEFT + COL_GAP);
-  expect(nodePos("skill").y).toBeGreaterThan(TOP);
+test("coarseCardRect places cards on fixed slots", () => {
+  const think = coarseCardRect("think");
+  const tool = coarseCardRect("tool");
+  expect(think.x).toBe(LEFT);
+  expect(think.y).toBe(TOP);
+  expect(tool.x).toBeGreaterThan(think.x);
+  expect(coarseCardRect("result").x).toBeGreaterThan(tool.x);
+  expect(coarseCardRect("skill").y).toBeGreaterThan(think.y);
 });
 
-test("forward edge is a horizontal run on the spine row", () => {
-  const cells = edgePath("think", "tool");
+test("fineCardLayout orders by rank and wraps at width", () => {
+  const wide = fineCardLayout(["chat", "bash", "think"], 200);
+  expect(wide.get("think")!.x).toBeLessThan(wide.get("bash")!.x);
+  expect(wide.get("bash")!.x).toBeLessThan(wide.get("chat")!.x);
+  expect(wide.get("think")!.y).toBe(wide.get("chat")!.y);
+
+  const narrow = fineCardLayout(["think", "bash", "edit", "read", "web"], CARD_W + 5);
+  const ys = [...narrow.values()].map((r) => r.y);
+  expect(Math.max(...ys)).toBeGreaterThan(Math.min(...ys));
+});
+
+test("cardWire same-row forward is a horizontal run between card edges", () => {
+  const a = coarseCardRect("think");
+  const b = coarseCardRect("tool");
+  const cells = cardWire(a, b);
   expect(cells.length).toBeGreaterThan(0);
-  expect(cells.every((c) => c.y === TOP)).toBe(true);
-  expect(cells.every((c) => c.ch === "─")).toBe(true);
-  expect(cells.every((c) => c.x > nodePos("think").x && c.x < nodePos("tool").x)).toBe(true);
+  expect(cells.every((c) => c.y === a.y + (a.h >> 1))).toBe(true);
+  expect(cells.every((c) => c.x >= a.x + a.w && c.x < b.x)).toBe(true);
 });
 
-test("backward edge dips below the spine (arc)", () => {
-  const cells = edgePath("result", "think");
-  expect(cells.some((c) => c.y > TOP)).toBe(true);
-});
-
-test("skill edge uses a vertical feeder at the skill column", () => {
-  const cells = edgePath("skill", "tool");
+test("cardWire different-row produces a connected L-path", () => {
+  const a = coarseCardRect("tool");
+  const b = coarseCardRect("skill");
+  const cells = cardWire(a, b);
   expect(cells.length).toBeGreaterThan(0);
-  expect(cells.every((c) => c.x === nodePos("skill").x)).toBe(true);
-  expect(cells.some((c) => c.ch === "│")).toBe(true);
-});
-
-test("self edge is empty", () => {
-  expect(edgePath("tool", "tool")).toEqual([]);
-});
-
-test("tool→skill edge is a vertical feeder downward", () => {
-  const cells = edgePath("tool", "skill");
-  expect(cells.length).toBeGreaterThan(0);
-  expect(cells.every((c) => c.x === nodePos("tool").x)).toBe(true);
-  expect(cells.every((c) => c.ch === "│")).toBe(true);
-  expect(cells.every((c) => c.y > TOP && c.y < nodePos("skill").y)).toBe(true);
-});
-
-test("think→chat forward edge spans multiple columns on the spine", () => {
-  const cells = edgePath("think", "chat");
-  expect(cells.length).toBeGreaterThan(0);
-  expect(cells.every((c) => c.y === TOP)).toBe(true);
-  expect(cells[0]!.x).toBeGreaterThan(nodePos("think").x);
-  expect(cells[cells.length - 1]!.x).toBeLessThan(nodePos("chat").x);
-});
-
-test("skill→result edge combines feeder-up then forward spine", () => {
-  const cells = edgePath("skill", "result");
-  expect(cells.some((c) => c.y > TOP)).toBe(true);   // feeder-up portion
-  expect(cells.some((c) => c.y === TOP)).toBe(true);  // spine portion
-  expect(cells.some((c) => c.ch === "│")).toBe(true);
-  expect(cells.some((c) => c.ch === "─")).toBe(true);
+  expect(cells.some((c) => c.y > a.y + a.h - 1)).toBe(true);
 });
