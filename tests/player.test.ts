@@ -74,3 +74,11 @@ test("lastAdvanceMs is -1 before first tick, then set", () => {
   p.tick(500);
   expect(p.lastAdvanceMs()).toBeGreaterThanOrEqual(0);
 });
+
+test("intervalMs shrinks as backlog grows (adaptive cadence)", () => {
+  const few = createPlayer({ baseIntervalMs: 1000, minIntervalMs: 1 });
+  few.setBeats([beat("1", "A")]); // backlog 1
+  const many = createPlayer({ baseIntervalMs: 1000, minIntervalMs: 1 });
+  many.setBeats([beat("1", "A"), beat("2", "B"), beat("3", "C"), beat("4", "D"), beat("5", "E")]); // backlog 5
+  expect(many.intervalMs()).toBeLessThan(few.intervalMs());
+});

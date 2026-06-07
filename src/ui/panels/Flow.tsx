@@ -28,7 +28,7 @@ export function Flow({ beats, cursor, pulse, lastAdvanceMs, intervalMs, width, h
   const bg = TRANSPARENT; // cell background stays transparent so the terminal bg shows through
   const dimWire = RGBA.fromHex(theme.wireDim);
 
-  // viewport: center on the cursor, clamped so we never scroll past the ends.
+  // viewport: center on the newest revealed node (the comet head, cursor-1), clamped to the ends.
   const total = graph.rows;
   const top = Math.max(0, Math.min(Math.max(0, total - height), (cursor - 1) * ROW_STRIDE - Math.floor(height / 2)));
 
