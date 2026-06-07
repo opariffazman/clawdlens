@@ -5,6 +5,8 @@ import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
 import { Menu, pickerRows, helpRows, projectsOf, sessionsOf } from "./Menu";
+import { CommandPalette } from "./CommandPalette";
+import { filterCommands } from "../core/commands";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { DEFAULT_PANEL } from "../core/types";
 import { createPlayer } from "../core/player";
@@ -30,6 +32,10 @@ export function App({ store }: { store: Store }) {
   const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
   const [full, setFull] = useState<import("../core/types").SessionState | null>(null);
   const [picker, setPicker] = useState<PickerState>(CLOSED);
+  const [palette, setPalette] = useState<{ open: boolean; query: string; index: number }>({ open: false, query: "", index: 0 });
+  const [filesSort, setFilesSort] = useState<"edits" | "reads" | "recent">("edits");
+  const [gitScope, setGitScope] = useState<"all" | "branch">("all");
+  const [tasksHideDone, setTasksHideDone] = useState(false);
 
   useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
   useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
@@ -82,7 +88,7 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, showHelp, pulse, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, showHelp, pulse, palette.open, palette.query, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
   const stepSel = (dir: number) => {
@@ -90,8 +96,60 @@ export function App({ store }: { store: Store }) {
     switchTo(sessions[Math.max(0, Math.min(sessions.length - 1, (i < 0 ? 0 : i) + dir))]?.id ?? null);
   };
 
+  const runCommand = (id: string) => {
+    switch (id) {
+      case "panel.lens": setPanel("lens"); break;
+      case "panel.files": setPanel("files"); break;
+      case "panel.tasks": setPanel("tasks"); break;
+      case "panel.git": setPanel("git"); break;
+      case "panel.log": setPanel("log"); break;
+      case "nav.sessions": setPicker({ open: true, stage: "projects", project: null, index: 0 }); break;
+      case "view.help": setShowHelp(true); break;
+      case "view.rescan":
+        store.pollOnce(Date.now());
+        if (selected && (panel === "files" || panel === "tasks" || panel === "git")) {
+          const fs = store.fullSession(selected.id); setFull(fs);
+          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd) : []);
+        }
+        break;
+      case "play.pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
+      case "play.replay": {
+        if (replay.player) { setReplay({ player: null }); break; }
+        if (!selected) break;
+        const rp = createPlayer({ baseIntervalMs: 900, replay: true, loop: false });
+        rp.setBeats(store.fullBeats(selected.id));
+        setReplay({ player: rp });
+        break;
+      }
+      case "play.loop": if (replay.player) { replay.player.setLoop(!replay.player.isLoop()); setReplay({ player: replay.player }); } break;
+      case "view.pulse": setPulse((p) => !p); break;
+      case "files.sort": setFilesSort((s) => (s === "edits" ? "reads" : s === "reads" ? "recent" : "edits")); break;
+      case "git.scope": setGitScope((s) => (s === "all" ? "branch" : "all")); break;
+      case "tasks.hideDone": setTasksHideDone((v) => !v); break;
+      case "app.quit": renderer.destroy(); break;
+    }
+  };
+
   useKeyboard((key) => {
     const kn = key.name;
+    if (palette.open) {
+      const matches = filterCommands(palette.query, panel);
+      if (kn === "escape") { setPalette({ open: false, query: "", index: 0 }); return; }
+      if (kn === "return" || kn === "enter") {
+        const cmd = matches[palette.index] ?? matches[0];
+        setPalette({ open: false, query: "", index: 0 });
+        if (cmd) runCommand(cmd.id);
+        return;
+      }
+      if (kn === "tab") { const top = matches[0]; if (top) setPalette((p) => ({ ...p, query: top.title, index: 0 })); return; }
+      if (kn === "up") { setPalette((p) => ({ ...p, index: Math.max(0, p.index - 1) })); return; }
+      if (kn === "down") { setPalette((p) => ({ ...p, index: Math.min(Math.max(0, matches.length - 1), p.index + 1) })); return; }
+      if (kn === "backspace") { setPalette((p) => ({ ...p, query: p.query.slice(0, -1), index: 0 })); return; }
+      if (key.sequence && key.sequence.length === 1 && key.sequence >= " ") {
+        setPalette((p) => ({ ...p, query: p.query + key.sequence, index: 0 }));
+      }
+      return;
+    }
     if (picker.open) {
       const len = picker.stage === "projects"
         ? projectsOf(sessions).length
@@ -114,7 +172,7 @@ export function App({ store }: { store: Store }) {
       }
       return;
     }
-    if (kn === ":") { setPicker({ open: true, stage: "projects", project: null, index: 0 }); return; }
+    if (kn === ":") { setPalette({ open: true, query: "", index: 0 }); return; }
     const action = mapKey({ name: key.name, shift: key.shift, ctrl: key.ctrl });
     if (!action) return;
     switch (action.type) {
@@ -174,7 +232,7 @@ export function App({ store }: { store: Store }) {
       {/* Fullscreen overlays render SOLO: hide the live panel behind them so the
           transparent menu composites over the terminal bg, not over live content
           (otherwise both layers interleave and the menu is unreadable). */}
-      {!picker.open && !showHelp && (
+      {!picker.open && !showHelp && !palette.open && (
         <Showcase
           session={selected}
           panel={panel}
@@ -203,6 +261,7 @@ export function App({ store }: { store: Store }) {
       {showHelp && (
         <Menu title=" KEYS · esc close " footer="esc close" rows={helpRows()} index={-1} width={w} height={h} />
       )}
+      {palette.open && <CommandPalette query={palette.query} index={palette.index} panel={panel} width={w} />}
     </box>
   );
 }
