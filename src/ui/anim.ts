@@ -31,3 +31,21 @@ export function lerpHex(a: string, b: string, t: number): string {
   const k = Math.max(0, Math.min(1, t));
   return rgbToHex(ar + (br - ar) * k, ag + (bg - ag) * k, ab + (bb - ab) * k);
 }
+
+// fg-only comet gradient along the spine. `d` = cells from the head (0 = head).
+// Two-stage blend: dim→lane by tail position, then lane→hot concentrated at the
+// head (t²). `floor` keeps a minimum lane tint (Git's resting branch color).
+export function cometColor(
+  d: number,
+  tail: number,
+  laneHex: string,
+  hotHex: string,
+  dimHex: string,
+  floor = 0,
+): string {
+  const t = pulseIntensity(d, tail); // 1 at head → 0 past the tail
+  const laneAmt = Math.max(floor, t);
+  if (laneAmt <= 0) return dimHex;
+  const base = lerpHex(dimHex, laneHex, laneAmt);
+  return lerpHex(base, hotHex, t * t);
+}

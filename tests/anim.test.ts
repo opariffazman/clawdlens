@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { spinnerFrame, pulseIntensity, lerpHex, pulsePhase } from "../src/ui/anim";
+import { spinnerFrame, pulseIntensity, lerpHex, pulsePhase, cometColor } from "../src/ui/anim";
 
 test("spinnerFrame cycles", () => {
   const a = spinnerFrame(0);
@@ -31,4 +31,11 @@ test("pulsePhase ramps 0→1 across one interval and clamps past it", () => {
 test("pulsePhase parks at 1 before the first advance or with a bad interval", () => {
   expect(pulsePhase(500, -1, 200)).toBe(1);  // lastAdvanceMs < 0
   expect(pulsePhase(500, 1000, 0)).toBe(1);  // intervalMs <= 0
+});
+
+test("cometColor: hot head, dim tail-end, floor preserved", () => {
+  const lane = "#00E5FF", hot = "#F2FBFF", dim = "#2E3440";
+  expect(cometColor(0, 7, lane, hot, dim)).toBe("#f2fbff");          // head (d=0) → hot
+  expect(cometColor(7, 7, lane, hot, dim)).toBe(dim);                // past tail, no floor → dimHex unchanged
+  expect(cometColor(7, 7, lane, hot, dim, 0.4)).toBe(lerpHex(dim, lane, 0.4)); // floor → resting lane tint
 });
