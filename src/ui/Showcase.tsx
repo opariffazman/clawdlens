@@ -46,7 +46,7 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
   return (
     <box style={{ flexGrow: 1, flexDirection: "column", backgroundColor: TRANSPARENT }}>
       <Header session={session} panel={panel} marker={marker} />
-      <TabBar panels={PANELS} active={panel} lens={lensOn ? session.lens : { ...session.lens, lensId: null }} width={width} />
+      <TabBar panels={PANELS} active={panel} lens={tasksLens} width={width} />
       <box
         style={{
           flexGrow: 1, flexShrink: 1,

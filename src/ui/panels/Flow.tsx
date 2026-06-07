@@ -1,7 +1,7 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { layoutFlow, ROW_STRIDE } from "../../core/flow-layout";
 import type { Beat } from "../../core/types";
-import { theme } from "../theme";
+import { theme, TRANSPARENT } from "../theme";
 import { pulseIntensity, lerpHex } from "../anim";
 import { iconFor } from "../icons";
 
@@ -15,7 +15,6 @@ interface Props {
 
 const ICON_COL = 6; // x where node icon/label start (after the gutter)
 const TAIL = 4; // pulse tail length in cells
-const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0); // inherit the terminal background
 
 // Safe fallback that uses only setCell; we prefer buffer.drawText where possible.
 function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA, bg: RGBA) {
