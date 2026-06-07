@@ -26,10 +26,9 @@ export function CommandBox({ query, ghost, width }: { query: string; ghost: stri
         // title on the top border
         const title = " command ";
         for (let i = 0; i < title.length && 2 + i < W - 1; i++) buf.setCell(2 + i, 0, title[i]!, acc, TRANSPARENT);
-        // content row:  : <query>▏<ghost>
+        // content row:  <query>▏<ghost>   (no ":" prefix — title signals command mode)
         let x = 2;
         const put = (s: string, color: RGBA) => { for (const ch of s) { if (x < W - 1) { buf.setCell(x, 1, ch, color, TRANSPARENT); x++; } } };
-        put(": ", acc);
         put(query, fg);
         if (x < W - 1) { buf.setCell(x, 1, "▏", acc, TRANSPARENT); x++; }
         put(ghost, dim);
