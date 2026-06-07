@@ -35,6 +35,7 @@ export function App({ store }: { store: Store }) {
   const [filesSort, setFilesSort] = useState<"edits" | "reads" | "recent">("edits");
   const [gitScope, setGitScope] = useState<"all" | "branch">("all");
   const [tasksHideDone, setTasksHideDone] = useState(false);
+  const [infoOn, setInfoOn] = useState(false);
 
   useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
   useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
@@ -61,10 +62,10 @@ export function App({ store }: { store: Store }) {
   const selected = sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null;
   const players = usePlayers(sessions, selected?.id ?? null);
 
-  // aggregate detail panels (files/tasks/git) read the FULL session, not just the live window
+  // aggregate detail panels (lens/files/tasks/git) read the FULL session, not just the live window
   useEffect(() => {
     if (!selected) { setFull(null); setCommits([]); return; }
-    if (panel === "files" || panel === "tasks" || panel === "git") {
+    if (panel === "lens" || panel === "files" || panel === "tasks" || panel === "git") {
       const fs = store.fullSession(selected.id);
       setFull(fs);
       setCommits(panel === "git" && fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
@@ -89,7 +90,7 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, infoOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
   const stepSel = (dir: number) => {
@@ -108,7 +109,7 @@ export function App({ store }: { store: Store }) {
       case "view.help": setShowHelp(true); break;
       case "view.rescan":
         store.pollOnce(Date.now());
-        if (selected && (panel === "files" || panel === "tasks" || panel === "git")) {
+        if (selected && (panel === "lens" || panel === "files" || panel === "tasks" || panel === "git")) {
           const fs = store.fullSession(selected.id); setFull(fs);
           if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
         }
@@ -127,6 +128,7 @@ export function App({ store }: { store: Store }) {
       case "files.sort": setFilesSort((s) => (s === "edits" ? "reads" : s === "reads" ? "recent" : "edits")); break;
       case "git.scope": setGitScope((s) => (s === "all" ? "branch" : "all")); break;
       case "tasks.hideDone": setTasksHideDone((v) => !v); break;
+      case "lens.info": setInfoOn((v) => !v); break;
       case "app.quit": renderer.destroy(); break;
     }
   };
@@ -194,10 +196,11 @@ export function App({ store }: { store: Store }) {
       case "speed-down": activePlayer?.setSpeed((activePlayer.speed() || 1) / 1.5); break;
       case "pulse": setPulse((p) => !p); break;
       case "lens": setLensOn((v) => !v); break;
+      case "info": setInfoOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
       case "rescan":
         store.pollOnce(Date.now());
-        if (selected && (panel === "files" || panel === "tasks" || panel === "git")) {
+        if (selected && (panel === "lens" || panel === "files" || panel === "tasks" || panel === "git")) {
           const fs = store.fullSession(selected.id); setFull(fs);
           if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
         }
@@ -244,6 +247,8 @@ export function App({ store }: { store: Store }) {
           panel={panel}
           presented={activePlayer ? activePlayer.presented() : []}
           cursor={cursor}
+          playerTotal={playerTotal}
+          infoOn={infoOn}
           lastAdvanceMs={lastAdvanceMs}
           intervalMs={intervalMs}
           pulse={pulse}

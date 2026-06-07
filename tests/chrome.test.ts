@@ -6,8 +6,8 @@ test("PANELS order: lens first, log last", () => {
   expect(PANELS).toEqual(["lens", "files", "tasks", "git", "log"]);
 });
 
-test("default panel is log until Lens body exists", () => {
-  expect(DEFAULT_PANEL).toBe("log");
+test("default panel is lens", () => {
+  expect(DEFAULT_PANEL).toBe("lens");
   expect(PANELS).toContain(DEFAULT_PANEL);
 });
 

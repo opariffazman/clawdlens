@@ -66,6 +66,7 @@ export interface Beat {
   toolUseId?: string;            // for tool beats, to pair with result
   ok?: boolean;                  // result success (tool beats, after pairing)
   skill?: string;                // attributionSkill if present
+  milestone?: "commit" | "branch"; // Bash git commit/branch-create, for Lens bloom/spark
 }
 
 export interface Commit {
@@ -115,7 +116,7 @@ export function newLensState(): LensState {
 // UI panel identity (kept in core so pure chrome helpers can reference it)
 export type PanelId = "lens" | "files" | "tasks" | "git" | "log";
 export const PANELS: PanelId[] = ["lens", "files", "tasks", "git", "log"];
-export const DEFAULT_PANEL: PanelId = "log";
+export const DEFAULT_PANEL: PanelId = "lens";
 
 export interface SessionState {
   id: string;
