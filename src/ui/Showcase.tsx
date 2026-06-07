@@ -12,6 +12,7 @@ export type { PanelId };
 export { PANELS };
 import { Header } from "./Header";
 import { TabBar } from "./TabBar";
+import { CommandBox } from "./CommandBox";
 
 interface Props {
   session: SessionState | null;
@@ -28,9 +29,12 @@ interface Props {
   progress: number;          // shared 0..1 reveal driven by the Flow player cursor
   filesSort: "edits" | "reads" | "recent";
   tasksHideDone: boolean;
+  paletteOpen: boolean;      // command palette active → overlay the CommandBox on top of the panel
+  paletteQuery: string;
+  paletteGhost: string;      // inline ghost completion
 }
 
-export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height, commits, full, progress, filesSort, tasksHideDone }: Props) {
+export function Showcase({ session, panel, presented, cursor, pulse, lensOn, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, borderStyle: "rounded", borderColor: theme.accent, backgroundColor: TRANSPARENT, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -41,11 +45,14 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
   // aggregate panels use the full-session fold when available, else the live state
   const agg = full ?? session;
   const tasksLens = lensOn ? agg.lens : { ...agg.lens, lensId: null };
-  // height budget: header(2) + tabbar(2) + bottom border(1) + slack = 6
-  const bodyHeight = Math.max(1, height - 6);
+  // height budget: header(2) + tabbar(2) + bottom border(1) + slack = 6; the command
+  // box (when open) is its own 3-row element above the tabs, so reserve those rows too.
+  const bodyHeight = Math.max(1, height - 6 - (paletteOpen ? 3 : 0));
   return (
     <box style={{ flexGrow: 1, flexDirection: "column", backgroundColor: TRANSPARENT }}>
       <Header session={session} panel={panel} marker={marker} />
+      {/* command palette sits ABOVE the panel (y-axis), pushing tabs + frame down */}
+      {paletteOpen && <CommandBox query={paletteQuery} ghost={paletteGhost} width={width} />}
       <TabBar panels={PANELS} active={panel} lens={tasksLens} width={width} />
       <box
         style={{

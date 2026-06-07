@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { COMMANDS, filterCommands } from "../src/core/commands";
+import { COMMANDS, filterCommands, commandSuggestions } from "../src/core/commands";
 
 test("registry has stable ids and panel switches", () => {
   const ids = COMMANDS.map((c) => c.id);
@@ -27,4 +27,28 @@ test("alias matches and fuzzy ranking orders results", () => {
 
 test("no match yields empty list", () => {
   expect(filterCommands("zzzzz", "log")).toHaveLength(0);
+});
+
+test("commandSuggestions: empty query yields no ghost", () => {
+  expect(commandSuggestions("", "log")).toEqual([]);
+});
+
+test("commandSuggestions: prefix completion ghosts the remainder", () => {
+  const sug = commandSuggestions("gi", "log");
+  expect(sug[0]!.ghost).toBe("t");            // "gi" + "t" = git
+  expect(sug[0]!.command.id).toBe("panel.git");
+});
+
+test("commandSuggestions: prefix-only, not fuzzy/substring", () => {
+  // "it" is a substring of "git" but not a prefix → no suggestion
+  expect(commandSuggestions("it", "log")).toHaveLength(0);
+});
+
+test("commandSuggestions: respects panel context", () => {
+  expect(commandSuggestions("sc", "git").map((s) => s.command.id)).toContain("git.scope");
+  expect(commandSuggestions("sc", "files").map((s) => s.command.id)).not.toContain("git.scope");
+});
+
+test("commandSuggestions: no match yields empty", () => {
+  expect(commandSuggestions("zzzzz", "log")).toEqual([]);
 });

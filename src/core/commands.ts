@@ -46,3 +46,27 @@ export function filterCommands(query: string, panel: PanelId): Command[] {
   scored.sort((a, b) => (b.score - a.score) || (a.i - b.i));
   return scored.map((x) => x.c);
 }
+
+export interface Suggestion { ghost: string; command: Command }
+
+// k9s-style inline completion: among panel-applicable commands, find aliases/titles
+// that have `query` as a PREFIX (case-insensitive) and return the remaining text as
+// the ghost. Shortest completion first, then registry order. Empty/no-prefix → [].
+// (Drives the inline ghost + Up/Down cycling; Enter falls back to filterCommands.)
+export function commandSuggestions(query: string, panel: PanelId): Suggestion[] {
+  if (!query) return [];
+  const q = query.toLowerCase();
+  const out: { s: Suggestion; len: number; i: number }[] = [];
+  COMMANDS.forEach((c, i) => {
+    if (c.context && !c.context(panel)) return;
+    let best: string | null = null;
+    for (const cand of [...(c.aliases ?? []), c.title]) {
+      if (cand.length > query.length && cand.toLowerCase().startsWith(q)) {
+        if (best === null || cand.length < best.length) best = cand;
+      }
+    }
+    if (best !== null) out.push({ s: { ghost: best.slice(query.length), command: c }, len: best.length, i });
+  });
+  out.sort((a, b) => (a.len - b.len) || (a.i - b.i));
+  return out.map((x) => x.s);
+}

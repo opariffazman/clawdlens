@@ -5,8 +5,8 @@ import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
 import { TRANSPARENT } from "./theme";
 import { Menu, pickerRows, helpRows, projectsOf, sessionsOf } from "./Menu";
-import { CommandPalette } from "./CommandPalette";
-import { filterCommands } from "../core/commands";
+import { CommandBox } from "./CommandBox";
+import { filterCommands, commandSuggestions } from "../core/commands";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { DEFAULT_PANEL } from "../core/types";
 import { createPlayer } from "../core/player";
@@ -31,7 +31,7 @@ export function App({ store }: { store: Store }) {
   const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
   const [full, setFull] = useState<import("../core/types").SessionState | null>(null);
   const [picker, setPicker] = useState<PickerState>(CLOSED);
-  const [palette, setPalette] = useState<{ open: boolean; query: string; index: number }>({ open: false, query: "", index: 0 });
+  const [palette, setPalette] = useState<{ open: boolean; query: string; sugIndex: number }>({ open: false, query: "", sugIndex: 0 });
   const [filesSort, setFilesSort] = useState<"edits" | "reads" | "recent">("edits");
   const [gitScope, setGitScope] = useState<"all" | "branch">("all");
   const [tasksHideDone, setTasksHideDone] = useState(false);
@@ -87,7 +87,7 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, showHelp, pulse, palette.open, palette.query, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
   const stepSel = (dir: number) => {
@@ -132,20 +132,20 @@ export function App({ store }: { store: Store }) {
   useKeyboard((key) => {
     const kn = key.name;
     if (palette.open) {
-      const matches = filterCommands(palette.query, panel);
-      if (kn === "escape") { setPalette({ open: false, query: "", index: 0 }); return; }
+      const sug = commandSuggestions(palette.query, panel);
+      if (kn === "escape") { setPalette({ open: false, query: "", sugIndex: 0 }); return; }
       if (kn === "return" || kn === "enter") {
-        const cmd = matches[palette.index] ?? matches[0];
-        setPalette({ open: false, query: "", index: 0 });
+        const cmd = sug[palette.sugIndex]?.command ?? filterCommands(palette.query, panel)[0];
+        setPalette({ open: false, query: "", sugIndex: 0 });
         if (cmd) runCommand(cmd.id);
         return;
       }
-      if (kn === "tab") { const top = matches[0]; if (top) setPalette((p) => ({ ...p, query: top.title, index: 0 })); return; }
-      if (kn === "up") { setPalette((p) => ({ ...p, index: Math.max(0, p.index - 1) })); return; }
-      if (kn === "down") { setPalette((p) => ({ ...p, index: Math.min(Math.max(0, matches.length - 1), p.index + 1) })); return; }
-      if (kn === "backspace") { setPalette((p) => ({ ...p, query: p.query.slice(0, -1), index: 0 })); return; }
+      if (kn === "tab" || kn === "right") { const g = sug[palette.sugIndex]?.ghost; if (g) setPalette((p) => ({ ...p, query: p.query + g, sugIndex: 0 })); return; }
+      if (kn === "up") { if (sug.length) setPalette((p) => ({ ...p, sugIndex: (p.sugIndex + 1) % sug.length })); return; }
+      if (kn === "down") { if (sug.length) setPalette((p) => ({ ...p, sugIndex: (p.sugIndex - 1 + sug.length) % sug.length })); return; }
+      if (kn === "backspace") { setPalette((p) => ({ ...p, query: p.query.slice(0, -1), sugIndex: 0 })); return; }
       if (key.sequence && key.sequence.length === 1 && key.sequence >= " ") {
-        setPalette((p) => ({ ...p, query: p.query + key.sequence, index: 0 }));
+        setPalette((p) => ({ ...p, query: p.query + key.sequence, sugIndex: 0 }));
       }
       return;
     }
@@ -171,7 +171,7 @@ export function App({ store }: { store: Store }) {
       }
       return;
     }
-    if (kn === ":") { setPalette({ open: true, query: "", index: 0 }); return; }
+    if (kn === ":") { setPalette({ open: true, query: "", sugIndex: 0 }); return; }
     const action = mapKey({ name: key.name, shift: key.shift, ctrl: key.ctrl });
     if (!action) return;
     switch (action.type) {
@@ -226,12 +226,17 @@ export function App({ store }: { store: Store }) {
     return m + spd;
   })();
 
+  // command palette: k9s-style inline ghost (prefix completion of the cycled suggestion)
+  const paletteSug = palette.open ? commandSuggestions(palette.query, panel) : [];
+  const paletteGhost = paletteSug[palette.sugIndex]?.ghost ?? "";
+
   return (
     <box style={{ width: w, height: h, backgroundColor: TRANSPARENT }}>
-      {/* Fullscreen overlays render SOLO: hide the live panel behind them so the
-          transparent menu composites over the terminal bg, not over live content
-          (otherwise both layers interleave and the menu is unreadable). */}
-      {!picker.open && !showHelp && !palette.open && (
+      {/* Fullscreen overlays (picker/help) render SOLO: hide the live panel behind them
+          so the transparent menu composites over the terminal bg, not over live content.
+          The command palette is NOT solo — it's an ephemeral box layered on top of the
+          panel (Showcase renders it), so the panel stays visible beneath. */}
+      {!picker.open && !showHelp && (
         <Showcase
           session={selected}
           panel={panel}
@@ -247,6 +252,9 @@ export function App({ store }: { store: Store }) {
           progress={progress}
           filesSort={filesSort}
           tasksHideDone={tasksHideDone}
+          paletteOpen={palette.open}
+          paletteQuery={palette.query}
+          paletteGhost={paletteGhost}
         />
       )}
       {picker.open && (
@@ -262,7 +270,6 @@ export function App({ store }: { store: Store }) {
       {showHelp && (
         <Menu title=" KEYS · esc close " footer="esc close" rows={helpRows()} index={-1} width={w} height={h} />
       )}
-      {palette.open && <CommandPalette query={palette.query} index={palette.index} panel={panel} width={w} />}
     </box>
   );
 }
