@@ -64,7 +64,7 @@ export function Showcase({ session, panel, presented, cursor, infoOn, lastAdvanc
           paddingLeft: 1, paddingRight: 1, backgroundColor: TRANSPARENT,
         }}
       >
-        {panel === "lens" && <Lens full={agg} presented={presented} cursor={cursor} pulse={pulse} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} status={session.status} infoOn={infoOn} width={width - 4} height={bodyHeight} />}
+        {panel === "lens" && <Lens presented={presented} cursor={cursor} pulse={pulse} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} status={session.status} infoOn={infoOn} width={width - 4} height={bodyHeight} />}
         {panel === "log" && <Flow beats={presented} cursor={cursor} pulse={pulse} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} width={width - 4} height={bodyHeight} />}
         {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} sort={filesSort} />}
         {panel === "tasks" && <Tasks todos={agg.todos} lens={tasksLens} height={bodyHeight} progress={progress} hideDone={tasksHideDone} />}

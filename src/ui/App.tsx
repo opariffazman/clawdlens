@@ -35,7 +35,7 @@ export function App({ store }: { store: Store }) {
   const [filesSort, setFilesSort] = useState<"edits" | "reads" | "recent">("edits");
   const [gitScope, setGitScope] = useState<"all" | "branch">("all");
   const [tasksHideDone, setTasksHideDone] = useState(false);
-  const [infoOn, setInfoOn] = useState(true);
+  const [infoOn, setInfoOn] = useState(false);
 
   useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
   useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
