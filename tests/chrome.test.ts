@@ -116,3 +116,20 @@ test("menuWindow: clamps at the end", () => {
   expect(w.count).toBe(10);
   expect(w.more).toBe(0);
 });
+
+test("tabBarCells: a tab whose last cell is the final column still renders", () => {
+  // single active "Log": notch occupies x=1..7, last col 7 == width-1 of 8
+  const cells = tabBarCells(tabModel(["log"], "log"), 8);
+  const row0 = cells.filter((c) => c.row === 0).map((c) => c.ch).join("");
+  expect(row0).toContain("Log");
+  for (const c of cells) { expect(c.x).toBeGreaterThanOrEqual(0); expect(c.x).toBeLessThan(8); }
+});
+
+test("menuWindow: clamps selected for out-of-range index", () => {
+  expect(menuWindow(5, -1, 3).selected).toBe(0);            // negative
+  const oob = menuWindow(5, 10, 3);                         // beyond end
+  expect(oob.selected).toBeGreaterThanOrEqual(0);
+  expect(oob.selected).toBeLessThan(oob.count);
+  const empty = menuWindow(0, 0, 3);                        // empty list
+  expect(empty).toEqual({ start: 0, count: 0, selected: 0, more: 0 });
+});

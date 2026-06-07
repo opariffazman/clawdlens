@@ -1,6 +1,8 @@
 // Pure chrome helpers: fuzzy matcher, hint list, tab-cell layout, menu windowing.
 // View-independent so they are unit-tested; the UI is a thin render of these.
 
+import type { PanelId } from "./types";
+
 // Subsequence fuzzy match. Returns a ranking score (higher = better) or null if
 // `query` is not a subsequence of `target`. Boosts consecutive runs and matches
 // at word starts (index 0 or after a non-alphanumeric char). Case-insensitive.
@@ -29,8 +31,6 @@ export function fuzzyScore(query: string, target: string): number | null {
   }
   return score;
 }
-
-import type { PanelId } from "./types";
 
 export interface Hint { key: string; label: string }
 
@@ -89,7 +89,7 @@ export function tabBarCells(tabs: TabSeg[], width: number): TabCell[] {
     if (tab.active) {
       const left = x;                 // `╭` / `┘`
       const right = x + L + 3;        // `╮` / `└`
-      if (right >= width - 1) break;  // no room — clip remaining tabs
+      if (right >= width) break;  // no room — clip remaining tabs
       push(left, 0, "╭", "active");
       push(left + 1, 0, "─", "active");
       for (let i = 0; i < L; i++) push(left + 2 + i, 0, tab.label[i]!, "active");
@@ -102,7 +102,7 @@ export function tabBarCells(tabs: TabSeg[], width: number): TabCell[] {
       x = right + 2;                  // gap after tab
     } else {
       const start = x + 1;            // 1-space lead
-      if (start + L >= width - 1) break;
+      if (start + L >= width) break;
       for (let i = 0; i < L; i++) push(start + i, 0, tab.label[i]!, "inactive");
       x = start + L + 2;              // trailing space + gap
     }
@@ -118,5 +118,5 @@ export function menuWindow(total: number, index: number, rows: number): MenuWind
   const r = Math.max(1, rows);
   const start = Math.max(0, Math.min(index - Math.floor(r / 2), Math.max(0, total - r)));
   const count = Math.min(r, total - start);
-  return { start, count, selected: index - start, more: Math.max(0, total - (start + count)) };
+  return { start, count, selected: Math.max(0, Math.min(index - start, count - 1)), more: Math.max(0, total - (start + count)) };
 }
