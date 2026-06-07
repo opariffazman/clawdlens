@@ -49,16 +49,18 @@ export interface Hint { key: string; label: string }
 
 const GLOBAL_HINTS: Hint[] = [
   { key: ":", label: "cmd" },
-  { key: "Tab", label: "cycle" },
-  { key: "h/l", label: "scrub" },
+  { key: "Tab", label: "panel" },
+  { key: "↑↓", label: "scrub" },
+  { key: "←→", label: "speed" },
   { key: "space", label: "pause" },
+  { key: "r", label: "replay" },
   { key: "?", label: "help" },
   { key: "q", label: "quit" },
 ];
 
 const PANEL_HINTS: Record<PanelId, Hint[]> = {
-  lens: [],
-  log: [{ key: "[ ]", label: "chunk" }, { key: "p", label: "pulse" }],
+  lens: [{ key: "i", label: "detail" }],
+  log: [],
   files: [{ key: ":sort", label: "sort" }],
   git: [{ key: ":scope", label: "scope" }],
   tasks: [{ key: ":hide-done", label: "hide done" }],

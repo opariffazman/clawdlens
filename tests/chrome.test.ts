@@ -154,3 +154,14 @@ test("rankRows: falls back to left when search absent, stable on ties", () => {
   const out = rankRows(rows, "g");
   expect(out.map((r) => r.left)).toEqual(["git", "grep"]); // both match; original order kept
 });
+
+test("hintsFor: dropped controls are gone, new globals present", () => {
+  const log = hintsFor("log");
+  expect(log.map((h) => h.label)).not.toContain("pulse");
+  expect(log.map((h) => h.label)).not.toContain("chunk");
+  const lens = hintsFor("lens").map((h) => h.key);
+  expect(hintsFor("git").map((h) => h.key)).toContain(":");   // global still there
+  expect(lens).toContain("i");                                 // lens detail hint
+  const labels = hintsFor("files").map((h) => h.label);
+  expect(labels).toContain("speed");                          // new global
+});
