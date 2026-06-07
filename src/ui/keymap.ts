@@ -4,7 +4,7 @@ export type Action =
   | { type: "beat-back" } | { type: "beat-fwd" } | { type: "chunk-back" } | { type: "chunk-fwd" }
   | { type: "to-start" } | { type: "to-live" } | { type: "pause" }
   | { type: "speed-up" } | { type: "speed-down" } | { type: "pulse" }
-  | { type: "lens" } | { type: "filter" } | { type: "rescan" } | { type: "help" } | { type: "quit" }
+  | { type: "lens" } | { type: "info" } | { type: "filter" } | { type: "rescan" } | { type: "help" } | { type: "quit" }
   | { type: "replay" } | { type: "loop" };
 
 export interface KeyEvent { name: string; shift?: boolean; ctrl?: boolean }
@@ -32,6 +32,7 @@ export function mapKey(key: KeyEvent): Action | null {
   if (n === "/") return { type: "filter" };
   if (n === "r") return { type: "rescan" };
   if (n === "?") return { type: "help" };
+  if (n === "i") return { type: "info" };
   if (n === "q") return { type: "quit" };
   return null;
 }

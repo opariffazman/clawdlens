@@ -5,10 +5,14 @@ import { theme, TRANSPARENT } from "../theme";
 import { pulseIntensity, lerpHex } from "../anim";
 
 interface Props {
-  full: SessionState | null;   // whole-session fold (aggregate source)
-  presented: Beat[];           // paced beats (for the cursor flare)
+  full: SessionState | null;   // whole-session fold (aggregate backdrop)
+  presented: Beat[];           // paced beats (live flow source)
   cursor: number;
   pulse: boolean;
+  lastAdvanceMs: number;       // player cadence
+  intervalMs: number;          // player cadence
+  status: import("../../core/types").Status;
+  infoOn: boolean;
   width: number;
   height: number;
 }

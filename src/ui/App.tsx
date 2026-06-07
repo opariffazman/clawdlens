@@ -35,6 +35,7 @@ export function App({ store }: { store: Store }) {
   const [filesSort, setFilesSort] = useState<"edits" | "reads" | "recent">("edits");
   const [gitScope, setGitScope] = useState<"all" | "branch">("all");
   const [tasksHideDone, setTasksHideDone] = useState(false);
+  const [infoOn, setInfoOn] = useState(true);
 
   useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
   useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
@@ -89,7 +90,7 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, infoOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
   const stepSel = (dir: number) => {
@@ -127,6 +128,7 @@ export function App({ store }: { store: Store }) {
       case "files.sort": setFilesSort((s) => (s === "edits" ? "reads" : s === "reads" ? "recent" : "edits")); break;
       case "git.scope": setGitScope((s) => (s === "all" ? "branch" : "all")); break;
       case "tasks.hideDone": setTasksHideDone((v) => !v); break;
+      case "lens.info": setInfoOn((v) => !v); break;
       case "app.quit": renderer.destroy(); break;
     }
   };
@@ -194,6 +196,7 @@ export function App({ store }: { store: Store }) {
       case "speed-down": activePlayer?.setSpeed((activePlayer.speed() || 1) / 1.5); break;
       case "pulse": setPulse((p) => !p); break;
       case "lens": setLensOn((v) => !v); break;
+      case "info": setInfoOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
       case "rescan":
         store.pollOnce(Date.now());
@@ -244,6 +247,7 @@ export function App({ store }: { store: Store }) {
           panel={panel}
           presented={activePlayer ? activePlayer.presented() : []}
           cursor={cursor}
+          infoOn={infoOn}
           lastAdvanceMs={lastAdvanceMs}
           intervalMs={intervalMs}
           pulse={pulse}

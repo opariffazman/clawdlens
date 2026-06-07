@@ -26,6 +26,7 @@ export const COMMANDS: Command[] = [
   { id: "files.sort", title: "Sort: edits / reads / recent", aliases: ["sort"], context: (p) => p === "files" },
   { id: "git.scope", title: "Scope: all / branch", aliases: ["scope"], context: (p) => p === "git" },
   { id: "tasks.hideDone", title: "Toggle hide-completed", aliases: ["hide-done", "hide"], context: (p) => p === "tasks" },
+  { id: "lens.info", title: "Toggle info detail", aliases: ["info", "detail"], context: (p) => p === "lens" },
   { id: "app.quit", title: "Quit", aliases: ["q", "quit", "exit"] },
 ];
 

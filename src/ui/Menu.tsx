@@ -87,6 +87,7 @@ export function helpRows(): MenuRow[] {
     { id: "h7", left: "speed", right: "+ / -" },
     { id: "h8", left: "pulse", right: "p" },
     { id: "h9", left: "lens ribbon", right: "w" },
+    { id: "h9b", left: "lens info", right: "i" },
     { id: "h10", left: "replay / loop", right: "R / L" },
     { id: "h11", left: "rescan", right: "r" },
     { id: "h12", left: "sessions", right: ": sessions" },
