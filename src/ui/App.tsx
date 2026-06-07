@@ -6,6 +6,7 @@ import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
 import { SessionPicker, projectsOf, sessionsOf, type PickerState } from "./SessionPicker";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
+import { DEFAULT_PANEL } from "../core/types";
 import { theme } from "./theme";
 import { createPlayer } from "../core/player";
 import { gitLog } from "../store/gitFetch";
@@ -20,7 +21,7 @@ export function App({ store }: { store: Store }) {
   const renderer = useRenderer();
   const [sessions, setSessions] = useState(store.sessions());
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panel, setPanel] = useState<PanelId>("flow");
+  const [panel, setPanel] = useState<PanelId>(DEFAULT_PANEL);
   const [pulse, setPulse] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
   const [lensOn, setLensOn] = useState(true);

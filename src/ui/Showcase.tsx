@@ -7,12 +7,13 @@ import { Flow } from "./panels/Flow";
 import { Files } from "./panels/Files";
 import { Tasks } from "./panels/Tasks";
 import { Git } from "./panels/Git";
+import { Lens } from "./panels/Lens";
 import type { Beat } from "../core/types";
 import type { Commit } from "../core/types";
 import { usePowerline, POWERLINE_RIGHT } from "./icons";
-
-export type PanelId = "flow" | "files" | "tasks" | "git";
-export const PANELS: PanelId[] = ["flow", "files", "tasks", "git"];
+import { type PanelId, PANELS } from "../core/types";
+export type { PanelId };
+export { PANELS };
 
 interface Props {
   session: SessionState | null;
@@ -63,7 +64,8 @@ export function Showcase({ session, panel, presented, cursor, pulse, lensOn, mar
       </box>
       {/* body — absorbs the slack */}
       <box style={{ flexGrow: 1, flexShrink: 1, marginTop: 1 }}>
-        {panel === "flow" && <Flow beats={presented} cursor={cursor} pulse={pulse} width={width - 4} height={bodyHeight} />}
+        {panel === "lens" && <Lens />}
+        {panel === "log" && <Flow beats={presented} cursor={cursor} pulse={pulse} width={width - 4} height={bodyHeight} />}
         {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} />}
         {panel === "tasks" && <Tasks todos={agg.todos} lens={tasksLens} height={bodyHeight} progress={progress} />}
         {panel === "git" && <Git commits={commits} width={width - 4} height={bodyHeight} progress={progress} />}
