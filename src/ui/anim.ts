@@ -9,6 +9,14 @@ export function pulseIntensity(d: number, tailLen: number): number {
   return 1 - d / tailLen;
 }
 
+// 0..1 progress from the last advance toward the next. Parks at 1 (head sits on
+// the newest node, breathing) when there is no advance to interpolate from.
+export function pulsePhase(now: number, lastAdvanceMs: number, intervalMs: number): number {
+  if (lastAdvanceMs < 0 || intervalMs <= 0) return 1;
+  const p = (now - lastAdvanceMs) / intervalMs;
+  return Math.max(0, Math.min(1, p));
+}
+
 function clampByte(n: number): number { return Math.max(0, Math.min(255, Math.round(n))); }
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
