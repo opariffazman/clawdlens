@@ -171,20 +171,25 @@ export function App({ store }: { store: Store }) {
 
   return (
     <box style={{ width: w, height: h, backgroundColor: TRANSPARENT }}>
-      <Showcase
-        session={selected}
-        panel={panel}
-        presented={activePlayer ? activePlayer.presented() : []}
-        cursor={cursor}
-        pulse={pulse}
-        lensOn={lensOn}
-        marker={marker}
-        width={w}
-        height={h}
-        commits={commits}
-        full={full}
-        progress={progress}
-      />
+      {/* Fullscreen overlays render SOLO: hide the live panel behind them so the
+          transparent menu composites over the terminal bg, not over live content
+          (otherwise both layers interleave and the menu is unreadable). */}
+      {!picker.open && !showHelp && (
+        <Showcase
+          session={selected}
+          panel={panel}
+          presented={activePlayer ? activePlayer.presented() : []}
+          cursor={cursor}
+          pulse={pulse}
+          lensOn={lensOn}
+          marker={marker}
+          width={w}
+          height={h}
+          commits={commits}
+          full={full}
+          progress={progress}
+        />
+      )}
       {picker.open && (
         <Menu
           title={picker.stage === "projects" ? " PROJECTS · ⏎ open · esc close " : ` ${picker.project ?? ""} · ⏎ open · esc back `}
