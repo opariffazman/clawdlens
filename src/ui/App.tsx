@@ -25,7 +25,6 @@ export function App({ store }: { store: Store }) {
   const [panel, setPanel] = useState<PanelId>(DEFAULT_PANEL);
   const [pulse, setPulse] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-  const [lensOn, setLensOn] = useState(true);
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
   const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
   const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
@@ -90,7 +89,7 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, infoOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, infoOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
 
@@ -222,7 +221,6 @@ export function App({ store }: { store: Store }) {
           lastAdvanceMs={lastAdvanceMs}
           intervalMs={intervalMs}
           pulse={pulse}
-          lensOn={lensOn}
           marker={marker}
           width={w}
           height={h}
