@@ -1,6 +1,6 @@
-# harness-flow
+# ClawdLens
 
-Terminal glass box for Claude Code sessions. Passive observer — tails `~/.claude/projects/**/*.jsonl`, no hooks, no setup. Shows each session activity: animated metro **Flow** + energy-pulse, file heatmap, agnostic tasks, git commit-graph, superpowers phase lens. OpenTUI + React on Bun.
+Terminal glass box for Claude Code sessions. Passive observer — tails `~/.claude/projects/**/*.jsonl`, no hooks, no setup. Shows each session activity: animated metro **Flow** + energy-pulse, file heatmap, agnostic tasks, git commit-graph, superpowers phase lens. OpenTUI + React on Bun. Public repo + npm package: `clawdlens` (brand: ClawdLens).
 
 ## Run
 
@@ -10,7 +10,7 @@ bun run dev          # the TUI
 bun run dump         # headless debug: print live sessions
 bun test             # full suite (bun:test)
 bunx tsc --noEmit    # typecheck (strict + noUncheckedIndexedAccess)
-HF_ICONS=unicode bun run dev   # plain-glyph fallback (no Nerd Font)
+CL_ICONS=unicode bun run dev   # plain-glyph fallback (no Nerd Font)
 ```
 
 ## Stack
@@ -45,9 +45,10 @@ src/ui/
   panels/Tasks.tsx agnostic: TodoWrite + reconstructed TaskCreate/TaskUpdate + superpowers phase fallback
   panels/Git.tsx   buffered commit-graph; lanes coloured per branch; build-up reveal + pulse
   SessionPicker.tsx  on-demand two-step picker (projects → sessions)
-  icons.ts         IconKey→glyph; nerd default + HF_ICONS=unicode fallback; powerline separators
+  icons.ts         IconKey→glyph; nerd default + CL_ICONS=unicode fallback; powerline separators
   format.ts keymap.ts usePlayers.ts anim.ts theme.ts
-bin/hf-dump.ts     debug CLI (proves engine headless)
+bin/clawdlens.ts       npm entry: shebang wrapper → src/index.tsx (bunx clawdlens)
+bin/clawdlens-dump.ts  debug CLI (proves engine headless)
 docs/superpowers/{specs,plans}/  design specs + impl plans
 ```
 
@@ -69,9 +70,19 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 - **Use superpowers skills whenever relevant** (not optional): `brainstorming` before any new feature/behaviour; `systematic-debugging` for ANY bug/test-failure/unexpected behaviour (root cause before fix — no guess-and-check); `test-driven-development` before impl; `writing-plans`/`executing-plans` for multi-step work; `verification-before-completion` before claiming done. Invoke via the `Skill` tool.
 - **Use the `opentui` skill for ANY OpenTUI work** (rendering, buffers, layout, keymaps, capabilities) — its `docs/**/*.mdx` are source of truth; don't guess the API.
 - **TDD pure core** — failing test first. Workflow: brainstorm → spec → plan → subagent-driven build. specs/plans in `docs/superpowers/`.
-- **Verify TUI visually via tmux** (agent has no TTY): `tmux new-session -d -s hf -x 150 -y 36 "bun run dev"; sleep 4; tmux capture-pane -t hf -p`. Use `-e` + diff two frames for colour/pulse animation. `tmux send-keys` to drive keys.
+- **Verify TUI visually via tmux** (agent has no TTY): `tmux new-session -d -s cl -x 150 -y 36 "bun run dev"; sleep 4; tmux capture-pane -t cl -p`. Use `-e` + diff two frames for colour/pulse animation. `tmux send-keys` to drive keys.
 - **Transparent canvas** — inherit terminal bg (OLED). Don't paint bg except selection/overlay accents.
-- Conventional commits, per task. Solo local repo, no remote → commit direct to main.
+- Conventional commits, per task. Public repo `origin` = `github.com:opariffazman/clawdlens`. Branch → PR (CI gates: typecheck + test) → merge to main. See Release.
+
+## Release
+
+Public repo `opariffazman/clawdlens`. `main` gated by CI.
+
+- **CI** (`.github/workflows/ci.yml`): push-main + all PRs → `bun install --frozen-lockfile` · `bunx tsc --noEmit` · `bun test`. PRs must be green.
+- **Release** (`.github/workflows/release.yml`): push tag `v*` → typecheck + test → `npm publish --provenance --access public` → GitHub Release (auto notes). Needs the `NPM_TOKEN` repo secret (set).
+- **Cut a release:** bump `package.json` `version` → `git commit -am "chore(release): vX.Y.Z"` → `git tag vX.Y.Z` → `git push --follow-tags`. Token also kept in gitignored `.env` for manual `npm publish` if ever needed.
+- **Users install** via `bunx clawdlens` or `bun install -g clawdlens`. The package ships TS source + `tsconfig.json`; Bun transpiles (and resolves `jsxImportSource`) on the user's machine — no build step.
+- Action versions pinned to current stable majors (`checkout@v6`, `setup-node@v6`+node24, `setup-bun@v2`) to avoid deprecated-runtime warnings.
 
 ## Gotchas
 
