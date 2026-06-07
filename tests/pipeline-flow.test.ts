@@ -108,3 +108,22 @@ test("fine grain splits tool counts by action; coarse lumps them", () => {
   const coarse = deriveFlow(beats, 2, 5, "coarse").main;
   expect(coarse.counts["tool"]).toBe(2);
 });
+
+test("toolBreakdown counts tool beats by iconKey, cursor-synced", () => {
+  const beats = [
+    beat({ kind: "tool", iconKey: "bash", ok: true }),
+    beat({ kind: "tool", iconKey: "edit", ok: true }),
+    beat({ kind: "tool", iconKey: "bash", ok: true }),
+    beat({ kind: "thinking" }),
+  ];
+  expect(deriveFlow(beats, 2, 5).main.toolBreakdown).toEqual({ bash: 1, edit: 1 });
+  const f = deriveFlow(beats, 4, 5).main;
+  expect(f.toolBreakdown).toEqual({ bash: 2, edit: 1 });
+  expect(f.counts["tool"]).toBe(3);
+});
+
+test("activeTool is the head tool's iconKey, else null", () => {
+  expect(deriveFlow([beat({ kind: "tool", iconKey: "edit" })], 1, 5).main.activeTool).toBe("edit");
+  expect(deriveFlow([beat({ kind: "tool", iconKey: "bash", ok: true })], 1, 5).main.activeTool).toBe("bash");
+  expect(deriveFlow([beat({ kind: "thinking" })], 1, 5).main.activeTool).toBeNull();
+});
