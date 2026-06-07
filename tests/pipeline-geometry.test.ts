@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { coarseCardRect, fineCardLayout, cardWire, CARD_W, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { coarseCardRect, pipeForward, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
 
 test("coarseCardRect places cards on fixed slots", () => {
   const think = coarseCardRect("think");
@@ -11,43 +11,43 @@ test("coarseCardRect places cards on fixed slots", () => {
   expect(coarseCardRect("skill").y).toBeGreaterThan(think.y);
 });
 
-test("fineCardLayout orders by rank and wraps at width", () => {
-  const wide = fineCardLayout(["chat", "bash", "think"], 200);
-  expect(wide.get("think")!.x).toBeLessThan(wide.get("bash")!.x);
-  expect(wide.get("bash")!.x).toBeLessThan(wide.get("chat")!.x);
-  expect(wide.get("think")!.y).toBe(wide.get("chat")!.y);
-
-  const narrow = fineCardLayout(["think", "bash", "edit", "read", "web"], CARD_W + 5);
-  const ys = [...narrow.values()].map((r) => r.y);
-  expect(Math.max(...ys)).toBeGreaterThan(Math.min(...ys));
-});
-
-test("cardWire same-row forward is a horizontal run between card edges", () => {
+test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at the target port", () => {
   const a = coarseCardRect("think");
   const b = coarseCardRect("tool");
-  const cells = cardWire(a, b);
-  expect(cells.length).toBeGreaterThan(0);
-  expect(cells.every((c) => c.y === a.y + (a.h >> 1))).toBe(true);
+  const cells = pipeForward(a, b);
+  const my = a.y + (a.h >> 1);
+  expect(cells.every((c) => c.y === my)).toBe(true);
   expect(cells.every((c) => c.x >= a.x + a.w && c.x < b.x)).toBe(true);
+  expect(cells[cells.length - 1]!.ch).toBe("▶");
+  expect(cells[cells.length - 1]!.x).toBe(b.x - 1);
 });
 
-test("cardWire different-row produces a connected L-path", () => {
-  const a = coarseCardRect("tool");
-  const b = coarseCardRect("skill");
-  const cells = cardWire(a, b);
-  expect(cells.length).toBeGreaterThan(0);
-  expect(cells.some((c) => c.y > a.y + a.h - 1)).toBe(true);
+test("pipeReturn is a U below: corners + a left arrowhead on the channel row", () => {
+  const a = coarseCardRect("result");
+  const b = coarseCardRect("think");
+  const channelY = a.y + a.h;
+  const cells = pipeReturn(a, b, channelY);
+  expect(cells.some((c) => c.ch === "╯")).toBe(true);
+  expect(cells.some((c) => c.ch === "╰")).toBe(true);
+  expect(cells.some((c) => c.ch === "◀")).toBe(true);
+  expect(cells.some((c) => c.y === channelY)).toBe(true);
 });
 
-test("cardWire same-row back-arc produces an arc below the cards", () => {
-  const a = coarseCardRect("result");  // right card
-  const b = coarseCardRect("think");   // left card, same row (b.x < a.x)
-  const cells = cardWire(a, b);
-  expect(cells.length).toBeGreaterThan(0);
-  const yArc = a.y + a.h; // one row below the card bottom
-  expect(cells.every((c) => c.y === yArc)).toBe(true);
-  expect(cells.some((c) => c.ch === "╮")).toBe(true);
-  expect(cells.some((c) => c.ch === "╭")).toBe(true);
-  const xs = cells.map((c) => c.x);
-  expect(Math.min(...xs)).toBeLessThan(Math.max(...xs));
+test("pipeBranch trunks from the parent and tees into each child", () => {
+  const parent = coarseCardRect("tool");
+  const children = expandStack(parent, 3);
+  const cells = pipeBranch(parent, children);
+  expect(cells.some((c) => c.ch === "│")).toBe(true);
+  expect(cells.filter((c) => c.ch === "├" || c.ch === "└").length).toBe(3);
+  expect(cells.filter((c) => c.ch === "└").length).toBe(1);
+});
+
+test("expandStack stacks n single-row child rects below the parent", () => {
+  const parent = coarseCardRect("tool");
+  const rects = expandStack(parent, 3);
+  expect(rects.length).toBe(3);
+  expect(rects.every((r) => r.h === 1)).toBe(true);
+  expect(rects.every((r) => r.y >= parent.y + parent.h)).toBe(true);
+  expect(rects[0]!.y).toBeLessThan(rects[1]!.y);
+  expect(rects[1]!.y).toBeLessThan(rects[2]!.y);
 });
