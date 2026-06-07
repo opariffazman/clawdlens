@@ -61,3 +61,24 @@ test("a closed subagent lane is omitted", () => {
   expect(f.agentsLive).toBe(0);
   expect(f.subLanes).toEqual([]);
 });
+
+test("actionIcon is head iconKey when activeKind is not result", () => {
+  const f = deriveFlow([beat({ kind: "thinking", iconKey: "thinking" })], 1, 3);
+  expect(f.main.actionIcon).toBe("thinking");
+});
+
+test("actionIcon is 'result' when activeKind is result", () => {
+  const f = deriveFlow([beat({ kind: "tool", ok: true, iconKey: "bash" })], 1, 3);
+  expect(f.main.activeKind).toBe("result");
+  expect(f.main.actionIcon).toBe("result");
+});
+
+test("detail falls back to label when detail is absent", () => {
+  const f = deriveFlow([beat({ kind: "text", label: "my-label" })], 1, 3);
+  expect(f.main.detail).toBe("my-label");
+});
+
+test("detail prefers beat detail over label", () => {
+  const f = deriveFlow([beat({ kind: "text", label: "L", detail: "the detail" })], 1, 3);
+  expect(f.main.detail).toBe("the detail");
+});
