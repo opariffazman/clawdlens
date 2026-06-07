@@ -1,177 +1,168 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
-import { buildPipeline, edgeVisible, type PipeKind, type PipeNode } from "../../core/pipeline";
-import type { Beat, BeatKind, SessionState } from "../../core/types";
+import { buildPipeline, type PipeKind } from "../../core/pipeline";
+import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
+import { nodePos, edgePath, LEFT, TOP, COL_GAP, STAGE_ROW_H } from "../../core/pipeline-geometry";
+import type { Beat, IconKey, SessionState, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
-import { pulseIntensity, lerpHex } from "../anim";
+import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
+import { iconFor } from "../icons";
 
 interface Props {
-  full: SessionState | null;   // whole-session fold (aggregate backdrop)
-  presented: Beat[];           // paced beats (live flow source)
+  full: SessionState | null;
+  presented: Beat[];
   cursor: number;
   pulse: boolean;
-  lastAdvanceMs: number;       // player cadence
-  intervalMs: number;          // player cadence
-  status: import("../../core/types").Status;
+  lastAdvanceMs: number;
+  intervalMs: number;
+  status: Status;
   infoOn: boolean;
   width: number;
   height: number;
 }
 
-const LEFT = 2;
-const TOP = 1;
-const COL_GAP = 14; // cells between stage columns (fits "◍ result" + arrow + stat)
-const ROW_GAP = 4;  // vertical block per stage row (row0 spine vs row1 skill)
-const TAIL = 4;     // energy tail length
-const BARS = "▁▂▃▄▅▆▇█";
+const TRAIL_HOPS = 3;
+const TAIL = 6;
+const SUBLANE_Y0 = TOP + STAGE_ROW_H + 3;
+const SUBLANE_H = 2;
+const MAX_SUBLANES = 3;
 
-const PIPE_OF: Partial<Record<BeatKind, PipeKind>> = {
-  thinking: "think", text: "chat", skill: "skill", tool: "tool",
+const STAGE_ICON: Record<PipeKind, IconKey> = {
+  think: "thinking", tool: "tool", skill: "skill", result: "result", chat: "text",
 };
+const STAGE_COL: Record<PipeKind, number> = { think: 0, tool: 1, skill: 1, result: 2, chat: 3 };
 
-function xOf(col: number) { return LEFT + col * COL_GAP; }
-function laneOf(col: number) { return theme.laneColors[col % theme.laneColors.length]!; }
-function frac(n: number, max: number) { return max > 0 ? n / max : 0; }
+function laneHexOf(kind: PipeKind) { return theme.laneColors[STAGE_COL[kind] % theme.laneColors.length]!; }
+function clip(s: string, n: number) { return s.length > n ? s.slice(0, Math.max(0, n - 1)) + "…" : s; }
 
-function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA, width: number) {
-  for (let i = 0; i < str.length; i++) {
-    const xi = x + i;
-    if (xi < 0) continue;
-    if (xi >= width) break;
-    buf.setCell(xi, y, str[i]!, fg, TRANSPARENT);
+function put(buf: OptimizedBuffer, x: number, y: number, ch: string, fg: RGBA, width: number, height: number) {
+  if (x < 0 || x >= width || y < 0 || y >= height) return;
+  buf.setCell(x, y, ch, fg, TRANSPARENT);
+}
+function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RGBA, width: number, height: number) {
+  for (let i = 0; i < str.length; i++) put(buf, x + i, y, str[i]!, fg, width, height);
+}
+
+// burst overlay for a git milestone landing on a node
+function drawBurst(buf: OptimizedBuffer, cx: number, cy: number, kind: "commit" | "branch", phase: number, laneHex: string, width: number, height: number) {
+  const r = Math.round(phase * 3);
+  const fade = 1 - phase;
+  if (r <= 0 || fade <= 0) return;
+  const col = RGBA.fromHex(lerpHex(theme.wireDim, kind === "commit" ? laneHex : theme.warn, fade));
+  if (kind === "commit") {
+    const ring: [number, number][] = [[r, 0], [-r, 0], [0, 1], [0, -1], [r - 1, 1], [-(r - 1), -1]];
+    const glyphs = "✦✧·*";
+    ring.forEach(([dx, dy], i) => put(buf, cx + dx, cy + dy, glyphs[i % glyphs.length]!, col, width, height));
+  } else {
+    ([[r, 0], [r, -1], [r - 1, 1], [1, -1]] as [number, number][]).forEach(([dx, dy]) => put(buf, cx + dx, cy + dy, "*", col, width, height));
+    put(buf, cx + 1, cy, "+", col, width, height);
   }
 }
-function barChar(f: number) {
-  return BARS[Math.max(0, Math.min(BARS.length - 1, Math.round(f * (BARS.length - 1))))]!;
-}
 
-type Cell = { x: number; y: number; ch: string };
-
-// one energy dot riding a run of cells; dir +1 = toward end, -1 = toward start
-function energyRun(
-  buf: OptimizedBuffer, cells: Cell[], weight: number, maxWeight: number,
-  laneHex: string, animating: boolean, now: number, restBoost: number, dir: 1 | -1,
-  width: number, height: number,
-) {
-  const n = cells.length;
-  if (n === 0) return;
-  const wf = frac(weight, maxWeight);
-  const rest = Math.min(1, 0.22 + 0.35 * wf + restBoost);
-  const span = n + TAIL;
-  const head = animating ? (now * (0.5 + 1.6 * wf)) % span : -999;
-  for (let i = 0; i < n; i++) {
-    const c = cells[i]!;
-    if (c.x < 0 || c.x >= width || c.y < 0 || c.y >= height) continue;
-    const pos = dir === 1 ? i : n - 1 - i;
-    let intensity = rest;
-    if (animating) {
-      const d = (((head - pos) % span) + span) % span;
-      intensity = Math.max(rest, pulseIntensity(d, TAIL));
+// main lane: fading trail + comet on the current transition + highlighted active node
+function drawMain(buf: OptimizedBuffer, ln: LaneFlow, phase: number, now: number, animating: boolean, tempo: number, infoOn: boolean, width: number, height: number) {
+  const trail = ln.trail;
+  for (let i = 0; i + 1 < trail.length; i++) {
+    const from = trail[i]!, to = trail[i + 1]!;
+    const cells = edgePath(from, to);
+    const laneHex = laneHexOf(to);
+    const isCurrent = i === trail.length - 2;
+    if (isCurrent && animating) {
+      const head = phase * cells.length;
+      cells.forEach((c, ci) => {
+        const col = cometColor(head - ci, TAIL, ln.errored ? theme.err : laneHex, theme.pulseHot, theme.wireDim, 0.15 + tempo);
+        put(buf, c.x, c.y, ln.errored ? "┉" : c.ch, RGBA.fromHex(col), width, height);
+      });
+    } else {
+      const baseI = 0.18 + 0.32 * ((i + 1) / Math.max(1, trail.length - 1));
+      cells.forEach((c) => put(buf, c.x, c.y, c.ch, RGBA.fromHex(lerpHex(theme.wireDim, laneHex, baseI)), width, height));
     }
-    buf.setCell(c.x, c.y, c.ch, RGBA.fromHex(lerpHex(theme.wireDim, laneHex, intensity)), TRANSPARENT);
   }
+  const active = ln.activeKind;
+  if (!active) return;
+  const p = nodePos(active);
+  const laneHex = laneHexOf(active);
+  const hot = ln.errored ? theme.err : theme.pulseHot;
+  const glyphCol = animating ? lerpHex(laneHex, hot, breathe(now)) : laneHex;
+  put(buf, p.x, p.y, "◉", RGBA.fromHex(glyphCol), width, height);
+  const icon = iconFor(ln.actionIcon ?? STAGE_ICON[active]);
+  const label = infoOn && ln.detail ? `${icon} ${clip(ln.detail, Math.max(6, COL_GAP - 3))}` : `${icon} ${active}`;
+  drawStr(buf, p.x + 2, p.y, label, RGBA.fromHex(ln.errored ? theme.err : theme.fg), width, height);
 }
 
-export function Lens({ full, presented, cursor, pulse, width, height }: Props) {
+// compact one-row view of an open subagent lane
+function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number, animating: boolean, infoOn: boolean, width: number, height: number) {
+  const taskHex = theme.laneColors[5 % theme.laneColors.length]!;
+  put(buf, LEFT + 2, y, iconFor("task"), RGBA.fromHex(taskHex), width, height);
+  drawStr(buf, LEFT + 4, y, clip(ln.label, 12), RGBA.fromHex(theme.dim), width, height);
+  if (!ln.activeKind) return;
+  const x = LEFT + 18;
+  const headi = animating ? Math.floor((now / 120) % 4) : 99;
+  for (let i = 0; i < 3; i++) put(buf, x + i, y, "·", RGBA.fromHex(i === headi ? laneHexOf(ln.activeKind) : theme.wireDim), width, height);
+  const laneHex = laneHexOf(ln.activeKind);
+  const glyph = ln.errored ? "✗" : iconFor(ln.actionIcon ?? STAGE_ICON[ln.activeKind]);
+  const col = ln.errored ? theme.err : (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex);
+  put(buf, x + 4, y, glyph, RGBA.fromHex(col), width, height);
+  if (infoOn && ln.detail) drawStr(buf, x + 6, y, clip(ln.detail, 18), RGBA.fromHex(theme.fg), width, height);
+}
+
+export function Lens({ full, presented, cursor, pulse, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
+  const flow = deriveFlow(presented, cursor, TRAIL_HOPS);
   const graph = buildPipeline(full?.beats ?? []);
-  if (graph.nodes.length === 0) return <text fg={theme.dim}>no activity yet</text>;
+  if (graph.nodes.length === 0 && flow.main.activeKind === null) {
+    return <text fg={theme.dim}>no activity yet</text>;
+  }
 
-  const byKind = new Map<PipeKind, PipeNode>(graph.nodes.map((n) => [n.kind, n]));
-  const colOf = (k: PipeKind) => byKind.get(k)?.col ?? 0;
-  const nameAt = (col: number) =>
-    graph.nodes.find((n) => n.row === 0 && n.col === col)?.kind ?? "";
-
-  const drawn = graph.edges.filter(
-    (e) => edgeVisible(e.weight, graph.maxWeight) && byKind.has(e.from) && byKind.has(e.to),
-  );
-  const liveKind = PIPE_OF[(presented[cursor]?.kind ?? "") as BeatKind] ?? null;
-  const flareEdge =
-    liveKind != null
-      ? drawn.filter((e) => e.to === liveKind).sort((a, b) => b.weight - a.weight)[0]
-      : undefined;
-
-  const spineCols = graph.nodes.filter((n) => n.row === 0).map((n) => n.col).sort((a, b) => a - b);
-  const animating = pulse;
+  const present = new Set<PipeKind>(graph.nodes.map((n) => n.kind));
+  if (flow.main.activeKind) present.add(flow.main.activeKind);
+  const countOf = new Map<PipeKind, number>(graph.nodes.map((n) => [n.kind, n.count]));
+  const idle = status === "idle" || status === "dormant" || status === "waiting";
+  const animating = pulse && !idle;
 
   return (
     <box
       style={{ width, height, backgroundColor: TRANSPARENT }}
       buffered
-      live={animating}
+      live={pulse}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
-        const now = (globalThis.performance?.now?.() ?? 0) / 120;
+        const now = Date.now();
+        const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
+        const tempo = intervalMs > 0 ? Math.max(0, Math.min(0.4, (600 / intervalMs) * 0.2)) : 0;
 
-        // forward spine: one dot per gap between adjacent present row-0 columns
-        for (let i = 0; i + 1 < spineCols.length; i++) {
-          const c0 = spineCols[i]!;
-          const c1 = spineCols[i + 1]!;
-          const fwd = drawn.filter(
-            (e) => !e.back &&
-              Math.min(colOf(e.from), colOf(e.to)) <= c0 &&
-              Math.max(colOf(e.from), colOf(e.to)) >= c1,
-          );
-          if (fwd.length === 0) continue;
-          const weight = fwd.reduce((m, e) => Math.max(m, e.weight), 0);
-          const start = xOf(c0) + 2 + nameAt(c0).length + 1;
-          const end = xOf(c1) - 1;
-          if (end <= start) continue;
-          const cells: Cell[] = [];
-          for (let x = start; x < end; x++) cells.push({ x, y: TOP, ch: "─" });
-          cells.push({ x: end, y: TOP, ch: "▶" });
-          const boost = fwd.some((e) => e === flareEdge) ? 0.45 : 0;
-          energyRun(buffer, cells, weight, graph.maxWeight, laneOf(c0), animating, now, boost, 1, width, height);
+        // 1. dim backdrop: every present stage + its count
+        for (const kind of present) {
+          const p = nodePos(kind);
+          put(buffer, p.x, p.y, "○", RGBA.fromHex(theme.wireDim), width, height);
+          drawStr(buffer, p.x + 2, p.y, kind, RGBA.fromHex(theme.dim), width, height);
+          const cnt = countOf.get(kind);
+          if (cnt) drawStr(buffer, p.x + 2, p.y + 1, `×${cnt}`, RGBA.fromHex(theme.wireDim), width, height);
         }
 
-        // back-edge arcs: top 2 by weight, stacked on rows below the row-0 stats
-        const backs = drawn.filter((e) => e.back).sort((a, b) => b.weight - a.weight).slice(0, 2);
-        backs.forEach((e, idx) => {
-          const xa = xOf(Math.min(colOf(e.from), colOf(e.to)));
-          const xb = xOf(Math.max(colOf(e.from), colOf(e.to)));
-          const yArc = TOP + 2 + idx;
-          if (yArc >= height || xb <= xa) return;
-          const cells: Cell[] = [{ x: xb, y: yArc, ch: "╯" }];
-          for (let x = xb - 1; x > xa; x--) cells.push({ x, y: yArc, ch: "─" });
-          cells.push({ x: xa, y: yArc, ch: "◂" });
-          const boost = e === flareEdge ? 0.45 : 0;
-          energyRun(buffer, cells, e.weight, graph.maxWeight, laneOf(colOf(e.to)), animating, now, boost, -1, width, height);
+        // 2. main lane flow (trail + comet + active node)
+        drawMain(buffer, flow.main, phase, now, animating, tempo, infoOn, width, height);
+
+        // 3. milestone bloom/spark (skip a failed commit)
+        if (flow.main.milestone && flow.main.activeKind && !(flow.main.milestone === "commit" && flow.main.errored)) {
+          const p = nodePos(flow.main.activeKind);
+          drawBurst(buffer, p.x, p.y, flow.main.milestone, phase, laneHexOf(flow.main.activeKind), width, height);
+        }
+
+        // 4. subagent lanes
+        if (flow.agentsLive > 0) {
+          drawStr(buffer, LEFT, SUBLANE_Y0 - 1, `▸ ${flow.agentsLive} agent${flow.agentsLive > 1 ? "s" : ""} live`, RGBA.fromHex(theme.accent), width, height);
+        }
+        flow.subLanes.slice(0, MAX_SUBLANES).forEach((ln, i) => {
+          drawSubLane(buffer, ln, SUBLANE_Y0 + i * SUBLANE_H, now, animating, infoOn, width, height);
         });
-
-        // skill branch: vertical feeder from the row-1 skill node up into the spine
-        const skill = byKind.get("skill");
-        if (skill) {
-          const x = xOf(skill.col);
-          const yMid = TOP + ROW_GAP;
-          const cells: Cell[] = [];
-          for (let y = yMid - 1; y > TOP; y--) cells.push({ x, y, ch: "│" });
-          cells.push({ x, y: TOP, ch: "┴" });
-          const w = drawn
-            .filter((e) => e.from === "skill" || e.to === "skill")
-            .reduce((m, e) => Math.max(m, e.weight), 0);
-          energyRun(buffer, cells, w, graph.maxWeight, laneOf(skill.col), animating, now, 0, -1, width, height);
+        if (flow.subLanes.length > MAX_SUBLANES) {
+          drawStr(buffer, LEFT, SUBLANE_Y0 + MAX_SUBLANES * SUBLANE_H, `+${flow.subLanes.length - MAX_SUBLANES} more`, RGBA.fromHex(theme.dim), width, height);
         }
 
-        // nodes + labels + stats
-        for (const n of graph.nodes) {
-          const x = xOf(n.col);
-          const yGlyph = TOP + n.row * ROW_GAP;
-          const yStat = yGlyph + 1;
-          if (x >= width || yGlyph >= height) continue;
-          const focused = n.kind === liveKind;
-          const glyph = focused ? "◉" : n.count > 1 ? "◍" : "○";
-          buffer.setCell(x, yGlyph, glyph, RGBA.fromHex(laneOf(n.col)), TRANSPARENT);
-          drawStr(buffer, x + 2, yGlyph, n.kind, RGBA.fromHex(focused ? theme.accent : theme.fg), width);
-
-          if (yStat >= height) continue;
-          let cx = x + 2;
-          const cnt = `×${n.count} `;
-          drawStr(buffer, cx, yStat, cnt, RGBA.fromHex(theme.dim), width);
-          cx += cnt.length;
-          if (cx < width) buffer.setCell(cx, yStat, barChar(frac(n.count, graph.maxCount)), RGBA.fromHex(laneOf(n.col)), TRANSPARENT);
-          cx += 2;
-          if (n.kind === "result") {
-            if ((n.ok ?? 0) > 0) { const s = `✓${n.ok} `; drawStr(buffer, cx, yStat, s, RGBA.fromHex(theme.ok), width); cx += s.length; }
-            if ((n.err ?? 0) > 0) { const s = `✗${n.err}`; drawStr(buffer, cx, yStat, s, RGBA.fromHex(theme.err), width); }
-          }
+        // 5. idle/waiting cue at the chat node
+        if (idle && present.has("chat")) {
+          const p = nodePos("chat");
+          const cue = status === "waiting" ? "waiting…" : status;
+          drawStr(buffer, p.x + 2, p.y, cue, RGBA.fromHex(lerpHex(theme.dim, theme.fg, breathe(now) - 0.6)), width, height);
         }
       }}
     />
