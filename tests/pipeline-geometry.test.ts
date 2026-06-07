@@ -33,6 +33,19 @@ test("pipeReturn is a U below: corners + a left arrowhead on the channel row", (
   expect(cells.some((c) => c.y === channelY)).toBe(true);
 });
 
+test("pipeReturn drops a connecting stem when the channel is below the card bottom", () => {
+  const a = coarseCardRect("result");
+  const b = coarseCardRect("think");
+  const channelY = a.y + a.h + 2; // a real channel below the cards
+  const cells = pipeReturn(a, b, channelY);
+  const ax = a.x + (a.w >> 1);
+  const bx = b.x + (b.w >> 1);
+  // a vertical stem on the source side connecting the card bottom down to the channel
+  expect(cells.some((c) => c.ch === "│" && c.x === ax && c.y === a.y + a.h)).toBe(true);
+  // and a rising stem on the target side
+  expect(cells.some((c) => c.ch === "│" && c.x === bx && c.y < channelY && c.y >= b.y + b.h)).toBe(true);
+});
+
 test("pipeBranch trunks from the parent and tees into each child", () => {
   const parent = coarseCardRect("tool");
   const children = expandStack(parent, 3);

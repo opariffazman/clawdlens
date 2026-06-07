@@ -119,7 +119,7 @@ function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: 
   if (!a || !b) return [];
   if (a.y === b.y && b.x > a.x) return pipeForward(a, b);
   if (a.y === b.y && b.x < a.x) return pipeReturn(a, b, channelY);
-  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]);
+  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse(); // reverse so the comet rides a→b (upward)
 }
 
 export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
@@ -154,20 +154,23 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
         const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
 
-        // when expansion is active, block y-range so U-return wire doesn't overdraw child rows
-        const expandMinY = childRects.length > 0 ? (childRects[0]!.y) : Infinity;
-        const expandMaxY = childRects.length > 0 ? (childRects[childRects.length - 1]!.y) : -Infinity;
-        const inExpand = (y: number) => childKinds.length > 0 && y >= expandMinY && y <= expandMaxY;
+        // during the tool expansion, back-edge (loop) pipes are hidden — the child
+        // stack occupies that space; the U-return reappears when collapsed.
+        const expanded = childKinds.length > 0;
+        const isReturn = (from: string, to: string) => {
+          const a = layout.get(from); const b = layout.get(to);
+          return !!a && !!b && a.y === b.y && b.x < a.x;
+        };
 
         for (const [a, b] of backbone) {
-          for (const c of wireFor(a, b, layout, channelY)) {
-            if (!inExpand(c.y)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-          }
+          if (expanded && isReturn(a, b)) continue;
+          for (const c of wireFor(a, b, layout, channelY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
         }
 
         const trail = flow.main.trail;
         for (let i = 0; i + 1 < trail.length; i++) {
-          const cells = wireFor(trail[i]!, trail[i + 1]!, layout, channelY).filter((c) => !inExpand(c.y));
+          if (expanded && isReturn(trail[i]!, trail[i + 1]!)) continue;
+          const cells = wireFor(trail[i]!, trail[i + 1]!, layout, channelY);
           if (cells.length === 0) continue;
           const laneHex = laneHexOf(trail[i + 1]!);
           if (i === trail.length - 2 && animating) {
