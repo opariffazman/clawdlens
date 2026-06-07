@@ -45,10 +45,13 @@ test("cometColor: hot head, dim tail-end, floor preserved", () => {
 });
 
 test("breathe stays within [0.6,1] and repeats by period", () => {
-  for (const t of [0, 200, 450, 900, 1800]) {
+  // 1350ms = 3/4 period → sin=-1 → the exact minimum (0.6); 450ms → sin=1 → max (1.0)
+  for (const t of [0, 200, 450, 900, 1350, 1800]) {
     const v = breathe(t, 1800);
     expect(v).toBeGreaterThanOrEqual(0.6 - 1e-9);
     expect(v).toBeLessThanOrEqual(1 + 1e-9);
   }
-  expect(breathe(0, 1800)).toBeCloseTo(breathe(1800, 1800), 5); // one full period
+  expect(breathe(1350, 1800)).toBeCloseTo(0.6, 5); // hits the true minimum
+  expect(breathe(450, 1800)).toBeCloseTo(1.0, 5);  // hits the true maximum
+  expect(breathe(450, 1800)).toBeCloseTo(breathe(2250, 1800), 5); // periodic at a non-trivial point
 });
