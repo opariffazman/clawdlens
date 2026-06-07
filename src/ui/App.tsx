@@ -38,7 +38,7 @@ export function App({ store }: { store: Store }) {
   const [infoOn, setInfoOn] = useState(false);
 
   useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
-  useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
+  useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state render cadence
   // Multiplexers (tmux) compute some glyph widths differently than OpenTUI's
   // detected width method. The incremental diff then mis-tracks the cursor and
   // leaves stale "ghost" cells when text scrolls/scrubs. Re-emitting the whole
