@@ -33,3 +33,27 @@ test("skill edge uses a vertical feeder at the skill column", () => {
 test("self edge is empty", () => {
   expect(edgePath("tool", "tool")).toEqual([]);
 });
+
+test("tool→skill edge is a vertical feeder downward", () => {
+  const cells = edgePath("tool", "skill");
+  expect(cells.length).toBeGreaterThan(0);
+  expect(cells.every((c) => c.x === nodePos("tool").x)).toBe(true);
+  expect(cells.every((c) => c.ch === "│")).toBe(true);
+  expect(cells.every((c) => c.y > TOP && c.y < nodePos("skill").y)).toBe(true);
+});
+
+test("think→chat forward edge spans multiple columns on the spine", () => {
+  const cells = edgePath("think", "chat");
+  expect(cells.length).toBeGreaterThan(0);
+  expect(cells.every((c) => c.y === TOP)).toBe(true);
+  expect(cells[0]!.x).toBeGreaterThan(nodePos("think").x);
+  expect(cells[cells.length - 1]!.x).toBeLessThan(nodePos("chat").x);
+});
+
+test("skill→result edge combines feeder-up then forward spine", () => {
+  const cells = edgePath("skill", "result");
+  expect(cells.some((c) => c.y > TOP)).toBe(true);   // feeder-up portion
+  expect(cells.some((c) => c.y === TOP)).toBe(true);  // spine portion
+  expect(cells.some((c) => c.ch === "│")).toBe(true);
+  expect(cells.some((c) => c.ch === "─")).toBe(true);
+});
