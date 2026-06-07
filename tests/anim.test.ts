@@ -38,4 +38,8 @@ test("cometColor: hot head, dim tail-end, floor preserved", () => {
   expect(cometColor(0, 7, lane, hot, dim)).toBe("#f2fbff");          // head (d=0) → hot
   expect(cometColor(7, 7, lane, hot, dim)).toBe(dim);                // past tail, no floor → dimHex unchanged
   expect(cometColor(7, 7, lane, hot, dim, 0.4)).toBe(lerpHex(dim, lane, 0.4)); // floor → resting lane tint
+  // mid-body cell (0 < d < tail): brighter than dim, not as hot as the head
+  const mid = cometColor(3, 7, lane, hot, dim);
+  expect(mid).not.toBe(dim);
+  expect(mid).not.toBe("#f2fbff");
 });

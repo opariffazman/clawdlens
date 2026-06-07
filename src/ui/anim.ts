@@ -33,7 +33,7 @@ export function lerpHex(a: string, b: string, t: number): string {
 }
 
 // fg-only comet gradient along the spine. `d` = cells from the head (0 = head).
-// Two-stage blend: dim→lane by tail position, then lane→hot concentrated at the
+// Two-stage blend: dim→lane by pulse intensity, then lane→hot concentrated at the
 // head (t²). `floor` keeps a minimum lane tint (Git's resting branch color).
 export function cometColor(
   d: number,
