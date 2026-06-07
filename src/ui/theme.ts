@@ -9,6 +9,7 @@ export const theme = {
   err: "#FF5370",
   wireDim: "#2E3440",
   wireHot: "#00E5FF",
+  pulseHot: "#F2FBFF",
   laneColors: ["#00E5FF", "#C792EA", "#FFCB6B", "#5AF78E", "#82AAFF", "#F78C6C"],
 };
 
