@@ -101,7 +101,7 @@ function drawHud(buf: OptimizedBuffer, flow: { main: LaneFlow; agentsLive: numbe
   const tempoBar = "▮".repeat(bars) + "▯".repeat(4 - bars);
   let cx = LEFT + 2;
   put(buf, cx, top + 2, "●", RGBA.fromHex(statusHex(status)), w, h); cx += 2;
-  const rest = `${status}   tempo ${tempoBar}   ✓${succ}% ${m.ok}/${m.err}   ${flow.agentsLive} agent   beats ${cursor}/${total}`;
+  const rest = `${status}   tempo ${tempoBar}   ✓${succ}% ${m.ok}/${m.err}   ${flow.agentsLive} agent${flow.agentsLive === 1 ? "" : "s"}   beats ${cursor}/${total}`;
   drawStr(buf, cx, top + 2, clip(rest, w - cx - 3), RGBA.fromHex(theme.dim), w, h);
 }
 
@@ -192,7 +192,8 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
           drawBurst(buffer, r.x + (r.w >> 1), r.y + r.h, flow.main.milestone, phase, laneHexOf(ak), width, height);
         }
 
-        let sy = TOP + 2 * (CARD_H + ROW_GAP);
+        const cardsBottom = layout.size > 0 ? Math.max(...[...layout.values()].map((r) => r.y + r.h)) : TOP + CARD_H;
+        let sy = cardsBottom + 1; // below the actual card block (handles fine-grain wrapping)
         if (flow.agentsLive > 0) {
           drawStr(buffer, LEFT, sy, `▸ ${flow.agentsLive} agent${flow.agentsLive > 1 ? "s" : ""} live`, RGBA.fromHex(theme.accent), width, height);
           sy += 1;
