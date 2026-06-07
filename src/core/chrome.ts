@@ -64,3 +64,50 @@ const TAB_LABELS: Record<PanelId, string> = {
 export function tabModel(panels: PanelId[], active: PanelId): TabSeg[] {
   return panels.map((id) => ({ id, label: TAB_LABELS[id], active: id === active }));
 }
+
+export type TabRole = "active" | "inactive" | "border";
+export interface TabCell { x: number; row: number; ch: string; role: TabRole }
+
+// Lay out the 2-row merged tab border. Row 0 holds tab tops/labels, row 1 holds
+// the frame's top border with an opening punched under the active tab. Colors are
+// expressed as roles; the renderer maps role -> RGBA (keeps hex out of core).
+export function tabBarCells(tabs: TabSeg[], width: number): TabCell[] {
+  const cells: TabCell[] = [];
+  // Row 1: continuous rule with frame corners.
+  const rule: string[] = new Array(width).fill("─");
+  if (width > 0) rule[0] = "╭";
+  if (width > 1) rule[width - 1] = "╮";
+
+  // Row 0: place tabs left-to-right starting at x=1 (x=0 is the frame corner).
+  let x = 1;
+  const push = (cx: number, row: number, ch: string, role: TabRole) => {
+    if (cx >= 0 && cx < width) cells.push({ x: cx, row, ch, role });
+  };
+
+  for (const tab of tabs) {
+    const L = tab.label.length;
+    if (tab.active) {
+      const left = x;                 // `╭` / `┘`
+      const right = x + L + 3;        // `╮` / `└`
+      if (right >= width - 1) break;  // no room — clip remaining tabs
+      push(left, 0, "╭", "active");
+      push(left + 1, 0, "─", "active");
+      for (let i = 0; i < L; i++) push(left + 2 + i, 0, tab.label[i]!, "active");
+      push(left + 2 + L, 0, "─", "active");
+      push(right, 0, "╮", "active");
+      // row 1 opening under the notch
+      rule[left] = "┘";
+      for (let i = left + 1; i < right; i++) rule[i] = " ";
+      rule[right] = "└";
+      x = right + 2;                  // gap after tab
+    } else {
+      const start = x + 1;            // 1-space lead
+      if (start + L >= width - 1) break;
+      for (let i = 0; i < L; i++) push(start + i, 0, tab.label[i]!, "inactive");
+      x = start + L + 2;              // trailing space + gap
+    }
+  }
+
+  for (let i = 0; i < width; i++) push(i, 1, rule[i]!, "border");
+  return cells;
+}
