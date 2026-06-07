@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useKeyboard, useRenderer } from "@opentui/react";
-import { RGBA } from "@opentui/core";
 import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
+import { TRANSPARENT } from "./theme";
 import { Menu, pickerRows, helpRows, projectsOf, sessionsOf } from "./Menu";
 import { CommandPalette } from "./CommandPalette";
 import { filterCommands } from "../core/commands";
@@ -16,7 +16,6 @@ type Store = ReturnType<typeof createStore>;
 type PickerState = { open: boolean; stage: "projects" | "sessions"; project: string | null; index: number };
 
 // transparent canvas → inherit the user's terminal background (OLED-friendly)
-const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0);
 const CLOSED: PickerState = { open: false, stage: "projects", project: null, index: 0 };
 
 export function App({ store }: { store: Store }) {
