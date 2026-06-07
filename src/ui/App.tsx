@@ -4,14 +4,14 @@ import { RGBA } from "@opentui/core";
 import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
-import { SessionPicker, projectsOf, sessionsOf, type PickerState } from "./SessionPicker";
+import { Menu, pickerRows, helpRows, projectsOf, sessionsOf } from "./Menu";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { DEFAULT_PANEL } from "../core/types";
-import { theme } from "./theme";
 import { createPlayer } from "../core/player";
 import { gitLog } from "../store/gitFetch";
 
 type Store = ReturnType<typeof createStore>;
+type PickerState = { open: boolean; stage: "projects" | "sessions"; project: string | null; index: number };
 
 // transparent canvas → inherit the user's terminal background (OLED-friendly)
 const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0);
@@ -185,12 +185,18 @@ export function App({ store }: { store: Store }) {
         full={full}
         progress={progress}
       />
-      {picker.open && <SessionPicker sessions={sessions} picker={picker} width={Math.min(54, w - 4)} height={h - 2} />}
+      {picker.open && (
+        <Menu
+          title={picker.stage === "projects" ? " PROJECTS · ⏎ open · esc close " : ` ${picker.project ?? ""} · ⏎ open · esc back `}
+          footer="⏎ open · j/k move · esc back"
+          rows={pickerRows(sessions, picker.stage === "projects" ? null : picker.project)}
+          index={picker.index}
+          width={w}
+          height={h}
+        />
+      )}
       {showHelp && (
-        <box style={{ position: "absolute", border: true, padding: 1, backgroundColor: theme.panel }} title="keys">
-          <text fg={theme.fg}>: sessions · Tab panels · h/l scrub · g/G start/live · space pause</text>
-          <text fg={theme.fg}>+/- speed · p pulse · w lens · R replay · L loop · r rescan · q quit</text>
-        </box>
+        <Menu title=" KEYS · esc close " footer="esc close" rows={helpRows()} index={-1} width={w} height={h} />
       )}
     </box>
   );
