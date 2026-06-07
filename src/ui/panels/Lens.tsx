@@ -129,7 +129,7 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
   const showSkill = !infoOn && (flow.main.counts["skill"] ?? 0) > 0;
   if (showSkill) presentKinds.push("skill");
   const layout = new Map<string, Rect>(presentKinds.map((k) => [k, coarseCardRect(k as Parameters<typeof coarseCardRect>[0])]));
-  const channelY = TOP + CARD_H;
+  const channelY = TOP + CARD_H + 1; // one row of clearance so the U-return has connecting legs
 
   const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
   if (showSkill) backbone.push(["tool", "skill"]);
