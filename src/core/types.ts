@@ -66,6 +66,7 @@ export interface Beat {
   toolUseId?: string;            // for tool beats, to pair with result
   ok?: boolean;                  // result success (tool beats, after pairing)
   skill?: string;                // attributionSkill if present
+  milestone?: "commit" | "branch"; // Bash git commit/branch-create, for Lens bloom/spark
 }
 
 export interface Commit {

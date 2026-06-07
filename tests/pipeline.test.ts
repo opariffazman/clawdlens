@@ -99,3 +99,13 @@ test("maxCount and maxWeight reflect the largest node/edge", () => {
   expect(g.maxCount).toBe(3);  // think x3
   expect(g.maxWeight).toBe(2); // think->tool x2
 });
+
+import { slotOf } from "../src/core/pipeline";
+
+test("slotOf returns the fixed stage slots", () => {
+  expect(slotOf("think")).toEqual({ col: 0, row: 0 });
+  expect(slotOf("tool")).toEqual({ col: 1, row: 0 });
+  expect(slotOf("skill")).toEqual({ col: 1, row: 1 });
+  expect(slotOf("result")).toEqual({ col: 2, row: 0 });
+  expect(slotOf("chat")).toEqual({ col: 3, row: 0 });
+});

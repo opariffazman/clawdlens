@@ -35,6 +35,9 @@ const SLOT: Record<PipeKind, { col: number; row: number }> = {
   result: { col: 2, row: 0 },
   chat:   { col: 3, row: 0 },
 };
+export function slotOf(kind: PipeKind): { col: number; row: number } {
+  return SLOT[kind];
+}
 const ORDER: PipeKind[] = ["think", "tool", "skill", "result", "chat"];
 
 function kindOf(k: BeatKind): PipeKind | null {

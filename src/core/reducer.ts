@@ -5,6 +5,14 @@ import {
 import type { IconKey, TodoItem } from "./types";
 import { addUsage, contextTokens, effectiveContextLimit, estimateCostUSD } from "./tokens";
 
+export function gitMilestone(command: string | undefined): "commit" | "branch" | undefined {
+  if (!command) return undefined;
+  if (/\bgit\b[^\n]*\bcommit\b/.test(command) && !/--dry-run/.test(command)) return "commit";
+  if (/\bgit\s+(?:checkout\s+-b|switch\s+-c)\b/.test(command)) return "branch";
+  if (/\bgit\s+branch\s+[^-\s]\S*/.test(command)) return "branch"; // `git branch <name>` (not -d/-D/--list)
+  return undefined;
+}
+
 function basename(p: string): string {
   const parts = p.replace(/\/+$/, "").split("/");
   return parts[parts.length - 1] || p;
@@ -192,10 +200,12 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
         pushBeat(s, { ts, kind: "tool", iconKey: "task", label: `Task · ${sub}`, lane, toolUseId: b.id, skill: e.attributionSkill });
         if (b.id) { s.openLanes = [...s.openLanes, b.id]; s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id }; }
       } else {
+        const cmd = typeof b.input?.command === "string" ? (b.input.command as string) : undefined;
         const detail = name === "Bash"
-          ? (typeof b.input?.description === "string" ? b.input.description as string : (typeof b.input?.command === "string" ? (b.input.command as string).slice(0, 60) : undefined))
+          ? (typeof b.input?.description === "string" ? b.input.description as string : (cmd ? cmd.slice(0, 60) : undefined))
           : fileOf(b.input) ?? (typeof b.input?.query === "string" ? (b.input.query as string).slice(0, 60) : undefined);
-        pushBeat(s, { ts, kind: "tool", iconKey: iconKeyFor(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill });
+        const milestone = name === "Bash" ? gitMilestone(cmd) : undefined;
+        pushBeat(s, { ts, kind: "tool", iconKey: iconKeyFor(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill, milestone });
         if (b.id) s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id };
         bumpHeat(s, name, b.input, ts);
       }

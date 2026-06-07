@@ -133,3 +133,27 @@ test("Task opens a subagent lane; its result closes it; sidechain beats land in 
   expect(grep.lane).toBe("T1");
   expect(s.openLanes).toEqual([]); // closed after result
 });
+
+import { gitMilestone } from "../src/core/reducer";
+
+test("gitMilestone flags commit and branch creation, ignores the rest", () => {
+  expect(gitMilestone('git commit -m "x"')).toBe("commit");
+  expect(gitMilestone("git add -A && git commit -m 'y'")).toBe("commit");
+  expect(gitMilestone("git commit --dry-run")).toBeUndefined();
+  expect(gitMilestone("git checkout -b feat/x")).toBe("branch");
+  expect(gitMilestone("git switch -c feat/x")).toBe("branch");
+  expect(gitMilestone("git branch feat/x")).toBe("branch");
+  expect(gitMilestone("git branch -d feat/x")).toBeUndefined();
+  expect(gitMilestone("git branch")).toBeUndefined();
+  expect(gitMilestone("git status")).toBeUndefined();
+  expect(gitMilestone(undefined)).toBeUndefined();
+});
+
+test("a Bash git commit beat carries milestone='commit'", () => {
+  let s = newSession("sid", "f");
+  s = applyEntry(s, { type: "assistant", message: { content: [
+    { type: "tool_use", id: "1", name: "Bash", input: { command: 'git commit -m "x"' } },
+  ] } }, 0);
+  const beat = s.beats.find((b) => b.label === "Bash")!;
+  expect(beat.milestone).toBe("commit");
+});
