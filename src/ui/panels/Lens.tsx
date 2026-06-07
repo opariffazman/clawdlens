@@ -96,7 +96,7 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
   drawStr(buf, LEFT + 4, y, clip(ln.label, 12), RGBA.fromHex(theme.dim), width, height);
   if (!ln.activeKind) return;
   const x = LEFT + 18;
-  const headi = animating ? Math.floor((now / 120) % 4) : 99;
+  const headi = animating ? Math.floor((now / 120) % 3) : 99;
   for (let i = 0; i < 3; i++) put(buf, x + i, y, "·", RGBA.fromHex(i === headi ? laneHexOf(ln.activeKind) : theme.wireDim), width, height);
   const laneHex = laneHexOf(ln.activeKind);
   const glyph = ln.errored ? "✗" : iconFor(ln.actionIcon ?? STAGE_ICON[ln.activeKind]);
