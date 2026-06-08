@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { PANELS, DEFAULT_PANEL } from "../src/core/types";
-import { fuzzyScore, hintsFor, tabModel, tabBarCells, menuWindow } from "../src/core/chrome";
+import { fuzzyScore, hintsFor, tabModel, tabBarCells, menuWindow, rankRows } from "../src/core/chrome";
 
 test("PANELS order: lens first, log last", () => {
   expect(PANELS).toEqual(["lens", "files", "tasks", "git", "log"]);
@@ -132,4 +132,36 @@ test("menuWindow: clamps selected for out-of-range index", () => {
   expect(oob.selected).toBeLessThan(oob.count);
   const empty = menuWindow(0, 0, 3);                        // empty list
   expect(empty).toEqual({ start: 0, count: 0, selected: 0, more: 0 });
+});
+
+test("rankRows: empty query returns rows unchanged", () => {
+  const rows = [{ left: "a", search: "alpha" }, { left: "b", search: "beta" }];
+  expect(rankRows(rows, "")).toEqual(rows);
+});
+
+test("rankRows: filters to fuzzy matches and ranks by score", () => {
+  const rows = [
+    { left: "1", search: "harness-flow" },
+    { left: "2", search: "kedatangan" },
+    { left: "3", search: "harness-x" },
+  ];
+  const out = rankRows(rows, "hx");
+  expect(out.map((r) => r.search)).toEqual(["harness-x"]); // only "harness-x" contains h..x
+});
+
+test("rankRows: falls back to left when search absent, stable on ties", () => {
+  const rows = [{ left: "git" }, { left: "grep" }];
+  const out = rankRows(rows, "g");
+  expect(out.map((r) => r.left)).toEqual(["git", "grep"]); // both match; original order kept
+});
+
+test("hintsFor: dropped controls are gone, new globals present", () => {
+  const log = hintsFor("log");
+  expect(log.map((h) => h.label)).not.toContain("pulse");
+  expect(log.map((h) => h.label)).not.toContain("chunk");
+  const lens = hintsFor("lens").map((h) => h.key);
+  expect(hintsFor("git").map((h) => h.key)).toContain(":");   // global still there
+  expect(lens).toContain("i");                                 // lens detail hint
+  const labels = hintsFor("files").map((h) => h.label);
+  expect(labels).toContain("speed");                          // new global
 });

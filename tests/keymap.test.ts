@@ -5,31 +5,25 @@ function a(name: string, mods: Partial<{ shift: boolean; ctrl: boolean }> = {}):
   return mapKey({ name, shift: !!mods.shift, ctrl: !!mods.ctrl });
 }
 
-test("navigation keys", () => {
-  expect(a("j")).toEqual({ type: "sess-down" });
-  expect(a("up")).toEqual({ type: "sess-up" });
-  expect(a("3")).toEqual({ type: "jump", n: 3 });
+test("timeline keys: arrows scrub + speed, space, replay", () => {
+  expect(a("up")).toEqual({ type: "beat-back" });
+  expect(a("down")).toEqual({ type: "beat-fwd" });
+  expect(a("left")).toEqual({ type: "speed-down" });
+  expect(a("right")).toEqual({ type: "speed-up" });
+  expect(a("space")).toEqual({ type: "pause" });
+  expect(a("r")).toEqual({ type: "replay" });
+});
+
+test("panels + misc", () => {
   expect(a("tab")).toEqual({ type: "panel-next" });
   expect(a("tab", { shift: true })).toEqual({ type: "panel-prev" });
+  expect(a("i")).toEqual({ type: "info" });
+  expect(a("?")).toEqual({ type: "help" });
+  expect(a("q")).toEqual({ type: "quit" });
 });
 
-test("timeline + playback keys", () => {
-  expect(a("h")).toEqual({ type: "beat-back" });
-  expect(a("left")).toEqual({ type: "beat-back" });
-  expect(a("G")).toEqual({ type: "to-live" });
-  expect(a("g")).toEqual({ type: "to-start" });
-  expect(a("space")).toEqual({ type: "pause" });
-  expect(a("+")).toEqual({ type: "speed-up" });
-  expect(a("p")).toEqual({ type: "pulse" });
-});
-
-test("unmapped returns null", () => {
-  expect(a("z")).toBeNull();
-});
-
-test("replay and loop keys", () => {
-  expect(a("R")).toEqual({ type: "replay" });
-  expect(a("r", { shift: true })).toEqual({ type: "replay" });
-  expect(a("L")).toEqual({ type: "loop" });
-  expect(a("l", { shift: true })).toEqual({ type: "loop" });
+test("dropped keys are unmapped", () => {
+  for (const k of ["j", "k", "h", "l", "g", "G", "p", "w", "L", "R", "1", "5", "[", "]", "+", "-", "z", "home", "end"]) {
+    expect(a(k)).toBeNull();
+  }
 });

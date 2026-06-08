@@ -4,28 +4,28 @@ import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
 import { TRANSPARENT } from "./theme";
-import { Menu, pickerRows, helpRows, projectsOf, sessionsOf } from "./Menu";
+import { shouldAnimate } from "./anim";
+import { Menu, pickerRows, helpRows } from "./Menu";
 import { CommandBox } from "./CommandBox";
 import { filterCommands, commandSuggestions } from "../core/commands";
+import { rankRows } from "../core/chrome";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { DEFAULT_PANEL } from "../core/types";
 import { createPlayer } from "../core/player";
 import { gitLog } from "../store/gitFetch";
 
 type Store = ReturnType<typeof createStore>;
-type PickerState = { open: boolean; stage: "projects" | "sessions"; project: string | null; index: number };
+type PickerState = { open: boolean; stage: "projects" | "sessions"; project: string | null; index: number; query: string; filtering: boolean };
 
 // transparent canvas → inherit the user's terminal background (OLED-friendly)
-const CLOSED: PickerState = { open: false, stage: "projects", project: null, index: 0 };
+const CLOSED: PickerState = { open: false, stage: "projects", project: null, index: 0, query: "", filtering: false };
 
 export function App({ store }: { store: Store }) {
   const renderer = useRenderer();
   const [sessions, setSessions] = useState(store.sessions());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelId>(DEFAULT_PANEL);
-  const [pulse, setPulse] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-  const [lensOn, setLensOn] = useState(true);
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
   const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
   const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
@@ -38,7 +38,7 @@ export function App({ store }: { store: Store }) {
   const [infoOn, setInfoOn] = useState(false);
 
   useEffect(() => { const unsub = store.subscribe(() => setSessions(store.sessions())); return () => { unsub(); }; }, [store]);
-  useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state for pulse
+  useEffect(() => { renderer.targetFps = 16; }, [renderer]); // steady-state render cadence
   // Multiplexers (tmux) compute some glyph widths differently than OpenTUI's
   // detected width method. The incremental diff then mis-tracks the cursor and
   // leaves stale "ghost" cells when text scrolls/scrubs. Re-emitting the whole
@@ -82,6 +82,7 @@ export function App({ store }: { store: Store }) {
   const progress = activePlayer && playerTotal > 0 ? cursor / playerTotal : 1;
   const lastAdvanceMs = activePlayer ? activePlayer.lastAdvanceMs() : -1;
   const intervalMs = activePlayer ? activePlayer.intervalMs() : 1000;
+  const animate = activePlayer ? shouldAnimate(activePlayer.mode(), lastAdvanceMs, intervalMs, Date.now()) : false;
 
   // Force a full repaint whenever the scroll position or layout changes — the
   // moments stale ghost cells form. Pulse-only frames (cursor unchanged) keep
@@ -90,13 +91,9 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, full, lensOn, infoOn, showHelp, pulse, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, picker.query, picker.filtering, full, infoOn, showHelp, animate, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
-  const stepSel = (dir: number) => {
-    const i = sessions.findIndex((s) => s.id === selected?.id);
-    switchTo(sessions[Math.max(0, Math.min(sessions.length - 1, (i < 0 ? 0 : i) + dir))]?.id ?? null);
-  };
 
   const runCommand = (id: string) => {
     switch (id) {
@@ -105,15 +102,8 @@ export function App({ store }: { store: Store }) {
       case "panel.tasks": setPanel("tasks"); break;
       case "panel.git": setPanel("git"); break;
       case "panel.log": setPanel("log"); break;
-      case "nav.sessions": setPicker({ open: true, stage: "projects", project: null, index: 0 }); break;
+      case "nav.sessions": setPicker({ open: true, stage: "projects", project: null, index: 0, query: "", filtering: false }); break;
       case "view.help": setShowHelp(true); break;
-      case "view.rescan":
-        store.pollOnce(Date.now());
-        if (selected && (panel === "lens" || panel === "files" || panel === "tasks" || panel === "git")) {
-          const fs = store.fullSession(selected.id); setFull(fs);
-          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
-        }
-        break;
       case "play.pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
       case "play.replay": {
         if (replay.player) { setReplay({ player: null }); break; }
@@ -123,8 +113,6 @@ export function App({ store }: { store: Store }) {
         setReplay({ player: rp });
         break;
       }
-      case "play.loop": if (replay.player) { replay.player.setLoop(!replay.player.isLoop()); setReplay({ player: replay.player }); } break;
-      case "view.pulse": setPulse((p) => !p); break;
       case "files.sort": setFilesSort((s) => (s === "edits" ? "reads" : s === "reads" ? "recent" : "edits")); break;
       case "git.scope": setGitScope((s) => (s === "all" ? "branch" : "all")); break;
       case "tasks.hideDone": setTasksHideDone((v) => !v); break;
@@ -154,22 +142,29 @@ export function App({ store }: { store: Store }) {
       return;
     }
     if (picker.open) {
-      const len = picker.stage === "projects"
-        ? projectsOf(sessions).length
-        : (picker.project ? sessionsOf(sessions, picker.project).length : 0);
+      const baseRows = pickerRows(sessions, picker.stage === "projects" ? null : picker.project);
+      const rows = rankRows(baseRows, picker.query);
+      const len = rows.length;
+      const printable = key.sequence && key.sequence.length === 1 && key.sequence >= " " && key.sequence !== "/" && kn !== "return" && kn !== "space";
+      if (kn === "/" ) { setPicker((p) => ({ ...p, filtering: true })); return; }
+      if (picker.filtering && kn === "escape") { setPicker((p) => ({ ...p, filtering: false, query: "", index: 0 })); return; }
+      if (picker.filtering && kn === "backspace") { setPicker((p) => ({ ...p, query: p.query.slice(0, -1), index: 0 })); return; }
+      if (picker.filtering && printable) { setPicker((p) => ({ ...p, query: p.query + key.sequence, index: 0 })); return; }
       if (kn === "escape" || kn === ":") {
-        setPicker(kn === "escape" && picker.stage === "sessions" ? { open: true, stage: "projects", project: null, index: 0 } : CLOSED);
-      } else if (kn === "j" || kn === "down") {
+        setPicker(kn === "escape" && picker.stage === "sessions"
+          ? { open: true, stage: "projects", project: null, index: 0, query: "", filtering: false }
+          : CLOSED);
+      } else if (kn === "down") {
         setPicker((p) => ({ ...p, index: Math.min(Math.max(0, len - 1), p.index + 1) }));
-      } else if (kn === "k" || kn === "up") {
+      } else if (kn === "up") {
         setPicker((p) => ({ ...p, index: Math.max(0, p.index - 1) }));
       } else if (kn === "return" || kn === "enter") {
         if (picker.stage === "projects") {
-          const proj = projectsOf(sessions)[Math.min(picker.index, len - 1)]?.project ?? null;
-          if (proj) setPicker({ open: true, stage: "sessions", project: proj, index: 0 });
+          const proj = (rows[Math.min(picker.index, len - 1)] as { id: string } | undefined)?.id ?? null;
+          if (proj) setPicker({ open: true, stage: "sessions", project: proj, index: 0, query: "", filtering: false });
         } else {
-          const s = (picker.project ? sessionsOf(sessions, picker.project) : [])[Math.min(picker.index, len - 1)];
-          if (s) switchTo(s.id);
+          const id = (rows[Math.min(picker.index, len - 1)] as { id: string } | undefined)?.id;
+          if (id) switchTo(id);
           setPicker(CLOSED);
         }
       }
@@ -180,31 +175,15 @@ export function App({ store }: { store: Store }) {
     if (!action) return;
     switch (action.type) {
       case "quit": renderer.destroy(); break;
-      case "sess-down": stepSel(1); break;
-      case "sess-up": stepSel(-1); break;
-      case "jump": switchTo(sessions[Math.min(sessions.length - 1, action.n - 1)]?.id ?? null); break;
       case "panel-next": setPanel((p) => PANELS[(PANELS.indexOf(p) + 1) % PANELS.length]!); break;
       case "panel-prev": setPanel((p) => PANELS[(PANELS.indexOf(p) + PANELS.length - 1) % PANELS.length]!); break;
       case "beat-back": activePlayer?.stepBack(); break;
-      case "beat-fwd": activePlayer?.stepForward(); break;
-      case "chunk-back": for (let i = 0; i < 10; i++) activePlayer?.stepBack(); break;
-      case "chunk-fwd": for (let i = 0; i < 10; i++) activePlayer?.stepForward(); break;
-      case "to-start": activePlayer?.toStart(); break;
-      case "to-live": activePlayer?.toLive(); break;
+      case "beat-fwd": activePlayer?.stepForward(); break; // stepForward snaps to live at head (player.ts:76)
       case "pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
       case "speed-up": activePlayer?.setSpeed((activePlayer.speed() || 1) * 1.5); break;
       case "speed-down": activePlayer?.setSpeed((activePlayer.speed() || 1) / 1.5); break;
-      case "pulse": setPulse((p) => !p); break;
-      case "lens": setLensOn((v) => !v); break;
       case "info": setInfoOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
-      case "rescan":
-        store.pollOnce(Date.now());
-        if (selected && (panel === "lens" || panel === "files" || panel === "tasks" || panel === "git")) {
-          const fs = store.fullSession(selected.id); setFull(fs);
-          if (panel === "git") setCommits(fs?.cwd ? gitLog(fs.cwd, gitScope === "all") : []);
-        }
-        break;
       case "replay": {
         if (replay.player) { setReplay({ player: null }); break; }
         if (!selected) break;
@@ -213,7 +192,6 @@ export function App({ store }: { store: Store }) {
         setReplay({ player: rp });
         break;
       }
-      case "loop": if (replay.player) { replay.player.setLoop(!replay.player.isLoop()); setReplay({ player: replay.player }); } break;
     }
   });
 
@@ -251,8 +229,7 @@ export function App({ store }: { store: Store }) {
           infoOn={infoOn}
           lastAdvanceMs={lastAdvanceMs}
           intervalMs={intervalMs}
-          pulse={pulse}
-          lensOn={lensOn}
+          animate={animate}
           marker={marker}
           width={w}
           height={h}
@@ -269,11 +246,12 @@ export function App({ store }: { store: Store }) {
       {picker.open && (
         <Menu
           title={picker.stage === "projects" ? " PROJECTS · ⏎ open · esc close " : ` ${picker.project ?? ""} · ⏎ open · esc back `}
-          footer="⏎ open · j/k move · esc back"
-          rows={pickerRows(sessions, picker.stage === "projects" ? null : picker.project)}
+          footer="⏎ open · ↑↓ move · esc back"
+          rows={rankRows(pickerRows(sessions, picker.stage === "projects" ? null : picker.project), picker.query)}
           index={picker.index}
           width={w}
           height={h}
+          filter={picker.filtering ? picker.query : undefined}
         />
       )}
       {showHelp && (

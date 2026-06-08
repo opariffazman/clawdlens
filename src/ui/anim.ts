@@ -55,3 +55,14 @@ export function breathe(now: number, periodMs = 1800): number {
   const s = 0.5 + 0.5 * Math.sin((2 * Math.PI * now) / periodMs);
   return 0.6 + 0.4 * s;
 }
+
+import type { PlayMode } from "../core/player";
+
+// Whether the buffered panels should run their continuous animation loop.
+// True only while the player is live AND advanced within the last ~2 intervals;
+// paused/history or a quiet live tail park the comet, so the loop can stop.
+export function shouldAnimate(mode: PlayMode, lastAdvanceMs: number, intervalMs: number, now: number): boolean {
+  if (mode !== "live") return false;
+  if (lastAdvanceMs < 0 || intervalMs <= 0) return false;
+  return now - lastAdvanceMs < intervalMs * 2;
+}

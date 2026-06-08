@@ -11,7 +11,7 @@ interface Props {
   presented: Beat[];
   cursor: number;
   total: number;
-  pulse: boolean;
+  animate: boolean;
   lastAdvanceMs: number;
   intervalMs: number;
   status: Status;
@@ -122,10 +122,10 @@ function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: 
   return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse(); // reverse so the comet rides a→b (upward)
 }
 
-export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
+export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const idle = status === "idle" || status === "dormant" || status === "waiting";
-  const animating = pulse && !idle;
+  const animating = animate && !idle;
 
   const presentKinds = [...COARSE_STAGES];
   const showSkill = !infoOn && (flow.main.counts["skill"] ?? 0) > 0;
@@ -147,7 +147,7 @@ export function Lens({ presented, cursor, total, pulse, lastAdvanceMs, intervalM
     <box
       style={{ width, height, backgroundColor: TRANSPARENT }}
       buffered
-      live={pulse}
+      live={animate}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();

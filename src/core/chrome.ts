@@ -32,20 +32,35 @@ export function fuzzyScore(query: string, target: string): number | null {
   return score;
 }
 
+// Filter + rank rows by fuzzy match on `search` (fallback `left`). Empty query
+// returns rows unchanged. Sorted by score desc; ties keep original order.
+export function rankRows<T extends { search?: string; left: string }>(rows: T[], query: string): T[] {
+  if (!query) return rows;
+  const scored: { r: T; s: number; i: number }[] = [];
+  rows.forEach((r, i) => {
+    const s = fuzzyScore(query, r.search ?? r.left);
+    if (s !== null) scored.push({ r, s, i });
+  });
+  scored.sort((a, b) => (b.s - a.s) || (a.i - b.i));
+  return scored.map((x) => x.r);
+}
+
 export interface Hint { key: string; label: string }
 
 const GLOBAL_HINTS: Hint[] = [
   { key: ":", label: "cmd" },
-  { key: "Tab", label: "cycle" },
-  { key: "h/l", label: "scrub" },
+  { key: "Tab", label: "panel" },
+  { key: "↑↓", label: "scrub" },
+  { key: "←→", label: "speed" },
   { key: "space", label: "pause" },
+  { key: "r", label: "replay" },
   { key: "?", label: "help" },
   { key: "q", label: "quit" },
 ];
 
 const PANEL_HINTS: Record<PanelId, Hint[]> = {
-  lens: [],
-  log: [{ key: "[ ]", label: "chunk" }, { key: "p", label: "pulse" }],
+  lens: [{ key: "i", label: "detail" }],
+  log: [],
   files: [{ key: ":sort", label: "sort" }],
   git: [{ key: ":scope", label: "scope" }],
   tasks: [{ key: ":hide-done", label: "hide done" }],

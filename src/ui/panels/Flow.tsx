@@ -8,7 +8,7 @@ import { iconFor } from "../icons";
 interface Props {
   beats: Beat[]; // presented (paced) beats from the player
   cursor: number; // index of the focused/current beat (history or live head)
-  pulse: boolean;
+  animate: boolean;
   lastAdvanceMs: number; // player cadence: when the last beat revealed
   intervalMs: number;    // player cadence: ms until the next reveal (speed-divided)
   width: number;
@@ -23,7 +23,7 @@ function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RG
   for (let i = 0; i < str.length; i++) buf.setCell(x + i, y, str[i]!, fg, bg);
 }
 
-export function Flow({ beats, cursor, pulse, lastAdvanceMs, intervalMs, width, height }: Props) {
+export function Flow({ beats, cursor, animate, lastAdvanceMs, intervalMs, width, height }: Props) {
   const graph = layoutFlow(beats);
   const bg = TRANSPARENT; // cell background stays transparent so the terminal bg shows through
   const dimWire = RGBA.fromHex(theme.wireDim);
@@ -36,7 +36,7 @@ export function Flow({ beats, cursor, pulse, lastAdvanceMs, intervalMs, width, h
     <box
       style={{ width, height, backgroundColor: TRANSPARENT }}
       buffered
-      live={pulse}
+      live={animate}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT); // reset to transparent each frame (no ghosting, no forced bg)
         const now = Date.now();
@@ -52,7 +52,7 @@ export function Flow({ beats, cursor, pulse, lastAdvanceMs, intervalMs, width, h
             const y = c.y - top;
             if (y < 0 || y >= height) continue;
             let color = dimWire;
-            if (pulse && cursor > 0) {
+            if (animate && cursor > 0) {
               color = RGBA.fromHex(cometColor(headY - c.y, TAIL, laneColor, theme.pulseHot, theme.wireDim));
             }
             const x = ICON_COL - 2 + c.x;
@@ -73,7 +73,7 @@ export function Flow({ beats, cursor, pulse, lastAdvanceMs, intervalMs, width, h
           );
           const laneHex = theme.laneColors[node.column % theme.laneColors.length]!;
           const iconColor = RGBA.fromHex(
-            pulse && focused ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex,
+            animate && focused ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex,
           );
           const x = ICON_COL - 2 + node.column * 2;
           if (x < 0 || x >= width) continue;

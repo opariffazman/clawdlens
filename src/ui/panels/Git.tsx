@@ -13,7 +13,7 @@ function drawStr(buf: OptimizedBuffer, x: number, y: number, str: string, fg: RG
   for (let i = 0; i < str.length; i++) buf.setCell(x + i, y, str[i]!, fg, bg);
 }
 
-export function Git({ commits, width, height, progress, pulse, lastAdvanceMs, intervalMs }: { commits: Commit[]; width: number; height: number; progress: number; pulse: boolean; lastAdvanceMs: number; intervalMs: number }) {
+export function Git({ commits, width, height, progress, animate, lastAdvanceMs, intervalMs }: { commits: Commit[]; width: number; height: number; progress: number; animate: boolean; lastAdvanceMs: number; intervalMs: number }) {
   const total = commits.length;
   if (total === 0) return <text fg={theme.dim}>not a git repo (or no commits)</text>;
   const revealed = Math.max(1, Math.ceil(progress * total)); // synced to the Flow cursor
@@ -37,7 +37,7 @@ export function Git({ commits, width, height, progress, pulse, lastAdvanceMs, in
     <box
       style={{ width, height, backgroundColor: TRANSPARENT }}
       buffered
-      live={animating && pulse}
+      live={animating && animate}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();
@@ -55,7 +55,7 @@ export function Git({ commits, width, height, progress, pulse, lastAdvanceMs, in
             if (x < 0 || x >= width) continue;
             const laneHex = theme.laneColors[Math.floor(cell.x / COL_WIDTH) % theme.laneColors.length]!;
             // 0.4 floor keeps each branch tinted its own color at rest; comet brightens above it
-            const hex = animating && pulse
+            const hex = animating && animate
               ? cometColor(headY - chronoY, TAIL, laneHex, theme.pulseHot, theme.wireDim, 0.4)
               : lerpHex(theme.wireDim, laneHex, 0.4);
             buffer.setCell(x, y, cell.ch, RGBA.fromHex(hex), TRANSPARENT);
@@ -72,7 +72,7 @@ export function Git({ commits, width, height, progress, pulse, lastAdvanceMs, in
           const x = ICON_COL + node.column * COL_WIDTH;
           const laneHex = theme.laneColors[node.column % theme.laneColors.length]!;
           const isEdge = node.row === minIdx;
-          const dotColor = RGBA.fromHex(animating && pulse && isEdge ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex);
+          const dotColor = RGBA.fromHex(animating && animate && isEdge ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex);
           buffer.setCell(x, y, isEdge ? "◉" : "●", dotColor, TRANSPARENT);
           const labelX = ICON_COL + (graph.columns + 1) * COL_WIDTH;
           const refStr = commit.refs.length ? `(${commit.refs.join(", ")}) ` : "";

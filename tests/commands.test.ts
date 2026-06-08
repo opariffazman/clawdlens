@@ -20,9 +20,16 @@ test("context commands appear only on their panel", () => {
 });
 
 test("alias matches and fuzzy ranking orders results", () => {
-  expect(filterCommands("refresh", "log").map((c) => c.id)).toContain("view.rescan");
+  expect(filterCommands("replay", "log").map((c) => c.id)).toContain("play.replay");
   const q = filterCommands("git", "log");
   expect(q[0]!.id).toBe("panel.git");          // exact/leading match ranks first
+});
+
+test("removed controls are not in the registry", () => {
+  const ids = COMMANDS.map((c) => c.id);
+  for (const gone of ["view.pulse", "play.loop", "view.rescan"]) {
+    expect(ids).not.toContain(gone);
+  }
 });
 
 test("no match yields empty list", () => {

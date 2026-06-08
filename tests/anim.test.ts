@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
 import { spinnerFrame, pulseIntensity, lerpHex, pulsePhase, cometColor, breathe } from "../src/ui/anim";
+import { shouldAnimate } from "../src/ui/anim";
 
 test("spinnerFrame cycles", () => {
   const a = spinnerFrame(0);
@@ -54,4 +55,20 @@ test("breathe stays within [0.6,1] and repeats by period", () => {
   expect(breathe(1350, 1800)).toBeCloseTo(0.6, 5); // hits the true minimum
   expect(breathe(450, 1800)).toBeCloseTo(1.0, 5);  // hits the true maximum
   expect(breathe(450, 1800)).toBeCloseTo(breathe(2250, 1800), 5); // periodic at a non-trivial point
+});
+
+test("shouldAnimate: only live + recently advanced", () => {
+  // mode not live → never animate
+  expect(shouldAnimate("paused", 1000, 200, 1100)).toBe(false);
+  expect(shouldAnimate("history", 1000, 200, 1100)).toBe(false);
+  // live, never advanced (lastAdvanceMs < 0) → false
+  expect(shouldAnimate("live", -1, 200, 5000)).toBe(false);
+  // live, bad interval → false
+  expect(shouldAnimate("live", 1000, 0, 1100)).toBe(false);
+  // live, just advanced → true
+  expect(shouldAnimate("live", 1000, 200, 1100)).toBe(true);
+  // live, within ~2 intervals → true
+  expect(shouldAnimate("live", 1000, 200, 1390)).toBe(true);
+  // live, gone quiet (> 2 intervals) → false
+  expect(shouldAnimate("live", 1000, 200, 1500)).toBe(false);
 });

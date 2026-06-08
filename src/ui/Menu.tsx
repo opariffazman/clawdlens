@@ -24,11 +24,10 @@ export function sessionsOf(sessions: SessionState[], project: string): SessionSt
     .sort((a, b) => b.lastActivityTs - a.lastActivityTs);
 }
 
-export interface MenuRow { id: string; left: string; leftColor?: string; right?: string; rightColor?: string }
+export interface MenuRow { id: string; left: string; leftColor?: string; right?: string; rightColor?: string; search?: string }
 
 // Fullscreen bordered menu — transparent inside, selection = ▸ + accent fg.
-export function Menu({ title, footer, rows, index, width, height }:
-  { title: string; footer: string; rows: MenuRow[]; index: number; width: number; height: number }) {
+export function Menu({ title, footer, rows, index, width, height, filter }: { title: string; footer: string; rows: MenuRow[]; index: number; width: number; height: number; filter?: string }) {
   const inner = Math.max(1, height - 4);
   const win = menuWindow(rows.length, index, inner);
   const slice = rows.slice(win.start, win.start + win.count);
@@ -53,6 +52,7 @@ export function Menu({ title, footer, rows, index, width, height }:
         );
       })}
       {win.more > 0 && <text fg={theme.dim}>{`  +${win.more} more`}</text>}
+      {filter !== undefined && <text fg={theme.accent}>{`/${filter}▎`}</text>}
       <box style={{ flexGrow: 1 }} />
       <text fg={theme.dim}>{footer}</text>
     </box>
@@ -67,30 +67,27 @@ export function pickerRows(sessions: SessionState[], project: string | null): Me
       left: truncate(p.project, 40),
       right: `${p.count}·${p.live}▲`,
       rightColor: p.live ? theme.ok : theme.dim,
+      search: p.project,
     }));
   }
   return sessionsOf(sessions, project).map((s) => {
     const g = statusGlyph(s.status);
-    return { id: s.id, left: `${g.glyph} ${truncate(s.title || s.id, 44)}`, leftColor: g.color };
+    return { id: s.id, left: `${g.glyph} ${truncate(s.title || s.id, 44)}`, leftColor: g.color, search: s.title || s.id };
   });
 }
 
 // Static help rows.
 export function helpRows(): MenuRow[] {
   return [
-    { id: "h1", left: ": command palette (fuzzy)", right: ":" },
+    { id: "h1", left: "command palette (fuzzy)", right: ":" },
     { id: "h2", left: "cycle panels", right: "Tab / Shift-Tab" },
-    { id: "h3", left: "scrub beats", right: "h / l  ← →" },
-    { id: "h4", left: "chunk scrub", right: "[ ]" },
-    { id: "h5", left: "start / live", right: "g / G" },
-    { id: "h6", left: "pause", right: "space" },
-    { id: "h7", left: "speed", right: "+ / -" },
-    { id: "h8", left: "pulse", right: "p" },
-    { id: "h9", left: "lens ribbon", right: "w" },
-    { id: "h9b", left: "lens info", right: "i" },
-    { id: "h10", left: "replay / loop", right: "R / L" },
-    { id: "h11", left: "rescan", right: "r" },
-    { id: "h12", left: "sessions", right: ": sessions" },
-    { id: "h13", left: "quit", right: "q  ( :q )" },
+    { id: "h3", left: "scrub timeline", right: "↑ / ↓" },
+    { id: "h4", left: "speed down / up", right: "← / →" },
+    { id: "h5", left: "pause / play", right: "space" },
+    { id: "h6", left: "replay", right: "r" },
+    { id: "h7", left: "lens detail", right: "i" },
+    { id: "h8", left: "sessions (with / filter)", right: ": sessions" },
+    { id: "h9", left: "help", right: "?" },
+    { id: "h10", left: "quit", right: "q" },
   ];
 }
