@@ -1,6 +1,6 @@
 # ClawdLens
 
-Terminal glass box for Claude Code sessions. Passive observer — tails `~/.claude/projects/**/*.jsonl`, no hooks, no setup. Shows each session activity: animated metro **Flow** + energy-pulse, file heatmap, agnostic tasks, git commit-graph, superpowers phase lens. OpenTUI + React on Bun. Public repo + npm package: `clawdlens` (brand: ClawdLens).
+Terminal glass box for Claude Code sessions. Passive observer — tails `~/.claude/projects/**/*.jsonl`, no hooks, no setup. Shows each session activity: live **Lens** pipeline (default), animated metro **Flow** + energy-pulse, file heatmap, agnostic tasks, git commit-graph, superpowers phase detection. OpenTUI + React on Bun. Public repo + npm package: `clawdlens` (brand: ClawdLens).
 
 ## Run
 
@@ -39,12 +39,13 @@ src/store/
   gitFetch.ts      gitLog(cwd): Bun.spawnSync git + parseGitLog
 src/ui/
   App.tsx          layout, keyboard, selection (by id), shared progress, replay state
-  Showcase.tsx     full-width: PhaseRibbon + header + active panel + StatusBar. PanelId = flow|files|tasks|git
-  panels/Flow.tsx  buffered metro graph + energy pulse (setCell + RGBA, live)
+  Showcase.tsx     full-width: Header + TabBar + active panel (+ CommandBox overlay on `:`). PanelId = lens|files|tasks|git|log; default = lens
+  panels/Lens.tsx  default: live n8n-style pipeline HUD (think→tool→skill→result→chat), comet/pulse, `i` per-action expand
+  panels/Flow.tsx  Log panel: buffered metro graph + energy pulse (setCell + RGBA, live)
   panels/Files.tsx file heatmap (full-session fileHeat)
   panels/Tasks.tsx agnostic: TodoWrite + reconstructed TaskCreate/TaskUpdate + superpowers phase fallback
   panels/Git.tsx   buffered commit-graph; lanes coloured per branch; build-up reveal + pulse
-  SessionPicker.tsx  on-demand two-step picker (projects → sessions)
+  Menu.tsx         fullscreen picker/help (rankRows fuzzy filter); CommandBox.tsx fuzzy palette; TabBar.tsx tabs; Header.tsx header
   icons.ts         IconKey→glyph; nerd default + CL_ICONS=unicode fallback; powerline separators
   format.ts keymap.ts usePlayers.ts anim.ts theme.ts
 bin/clawdlens.ts       npm entry: shebang wrapper → src/index.tsx (bunx clawdlens)
@@ -56,14 +57,14 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 
 - **Beat** = one narrative event (thinking/text/tool/skill/result). `iconKey` semantic; glyph resolved in UI (icons.ts).
 - **Player cursor = ONE shared timeline.** `progress = activePlayer.cursor()/all().length` drives ALL panels (Flow/Files/Tasks/Git) — reveal in sync, finish together. Not per-panel timers.
-- **Adaptive cadence** (live AND replay): `interval = max(min, base*factor)/speed`; factor eases as catches up; `+`/`-` scale whole interval via `/speed`.
+- **Adaptive cadence** (live AND replay): `interval = max(min, base*factor)/speed`; factor eases as catches up; `←`/`→` scale whole interval via `/speed`.
 - **Backfill vs full-fold.** Live store tails from EOF + ~64KB backfill (recent only). Aggregate panels (Files/Tasks/git cwd) use `store.fullSession()` = whole transcript.
 - **Lens** = superpowers phases from skill attribution + spec/plan file writes.
 - **Agnostic tasks**: reducer reconstructs from harness TaskCreate(subject)/TaskUpdate(taskId,status) sequentially, plus TodoWrite.
 
 ## Keys
 
-`:` session picker · `Tab`/`Shift-Tab` panels · `h/l`/`←→` scrub · `[ ]` chunk · `g`/`G` start/live · `space` pause · `+`/`-` speed · `p` pulse · `w` lens · `R` replay · `L` loop · `r` rescan · `?` help · `q` quit.
+`:` command palette (fuzzy; sessions via `:`→sessions, then `/` to filter) · `Tab`/`Shift-Tab` panels · `↑`/`↓` scrub · `←`/`→` speed · `space` pause · `r` replay · `i` lens detail · `?` help · `q` quit. Energy-pulse auto-runs while the timeline moves; `q` restores the terminal cleanly (no Ctrl+C).
 
 ## Conventions
 
