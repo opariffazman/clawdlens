@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useRenderer } from "@opentui/react";
 import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
@@ -60,7 +60,15 @@ export function App({ store }: { store: Store }) {
   }, [replay.player]);
 
   const selected = sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null;
-  const players = usePlayers(sessions, selected?.id ?? null);
+  // The live store keeps only a 64 KB backfill window per session, which large
+  // metadata entries can fill entirely (0 beats). Fold the FULL transcript for
+  // the selected session — re-folding only on switch or new activity — and seed
+  // the player from it, the same source replay and the aggregate panels use.
+  const selectedFullBeats = useMemo(
+    () => (selected ? store.fullBeats(selected.id) : []),
+    [selected?.id, selected?.lastActivityTs, store],
+  );
+  const players = usePlayers(sessions, selected?.id ?? null, selectedFullBeats);
 
   // aggregate detail panels (lens/files/tasks/git) read the FULL session, not just the live window
   useEffect(() => {
