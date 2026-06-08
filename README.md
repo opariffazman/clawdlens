@@ -6,10 +6,10 @@
 
 Terminal glass box for your Claude Code sessions. A passive observer that tails
 `~/.claude/projects/**/*.jsonl` and shows — at a calm, slow-burn pace — what every
-running session is doing: an animated metro **Flow** of its actions, live status, a
-token/cost/context gauge, a file heatmap, an agnostic task list, a git commit-graph,
-and a superpowers workflow **phase lens**. Zero setup. No hooks. Never leave the
-terminal.
+running session is doing: a live **Lens** pipeline of its thinking, tools, skills and
+results; an animated metro **Flow** of its actions; live status; a token/cost/context
+gauge; a file heatmap; an agnostic task list; and a git commit-graph. Zero setup. No
+hooks. Never leave the terminal.
 
 ## Install
 
@@ -46,9 +46,12 @@ CL_ICONS=unicode clawdlens
 
 ## Keys
 
-`:` session picker · `Tab`/`Shift-Tab` panels · `h`/`l` or `←`/`→` scrub ·
-`[` `]` chunk · `g`/`G` start/live · `space` pause · `+`/`-` speed · `p` energy-pulse ·
-`w` lens · `R` replay · `L` loop · `r` rescan · `?` help · `q` quit.
+`:` command palette (fuzzy) · `Tab`/`Shift-Tab` panels · `↑`/`↓` scrub timeline ·
+`←`/`→` speed · `space` pause/play · `r` replay · `i` lens detail · `?` help · `q` quit.
+
+Sessions live behind the palette: `:` → `sessions`, then `/` to fuzzy-filter the list.
+The energy-pulse animation now runs automatically whenever the timeline is moving — no
+toggle. Quitting with `q` restores the terminal cleanly (no Ctrl+C needed).
 
 ## How it works
 
