@@ -15,7 +15,7 @@ export function mergeHeaderSession(
   if (!live || !full) return live;
   return {
     ...live,
-    costUSD: full.costUSD,
+    costUSD: full.costUSD > 0 ? full.costUSD : live.costUSD,
     startedTs: full.startedTs > 0 ? full.startedTs : live.startedTs,
   };
 }

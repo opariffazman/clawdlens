@@ -41,3 +41,11 @@ test("mergeHeaderSession keeps live.startedTs when full.startedTs is 0", () => {
   expect(m.startedTs).toBe(5000); // empty fold -> keep the live start
   expect(m.costUSD).toBe(99);     // cost still grafted from full
 });
+
+test("mergeHeaderSession keeps live.costUSD when full.costUSD is 0 (failed/empty fold)", () => {
+  const live = sess({ costUSD: 12, startedTs: 5000 });
+  const full = sess({ costUSD: 0, startedTs: 0 });
+  const m = mergeHeaderSession(live, full)!;
+  expect(m.costUSD).toBe(12);    // empty fold -> keep the live cost, never blank it to $0
+  expect(m.startedTs).toBe(5000); // same empty-fold fallback for startedTs
+});
