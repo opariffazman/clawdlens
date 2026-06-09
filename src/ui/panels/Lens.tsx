@@ -9,6 +9,7 @@ import { iconFor } from "../icons";
 import { put, drawStr, clip, laneHexOf } from "./lens/draw";
 import { detectLensFromBeats } from "../../core/lens";
 import { drawPhaseRibbon } from "./lens/phaseRibbon";
+import { drawEconomy } from "./lens/economy";
 
 interface Props {
   presented: Beat[];
@@ -19,6 +20,7 @@ interface Props {
   intervalMs: number;
   status: Status;
   infoOn: boolean;
+  tokens: import("../../core/types").SessionTokens;
   width: number;
   height: number;
 }
@@ -114,7 +116,7 @@ function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: 
   return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse();
 }
 
-export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
+export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, tokens, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const lensState = detectLensFromBeats(presented.slice(0, cursor));
   const ribbonOn = lensState.lensId === "superpowers";
@@ -158,7 +160,8 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const blockH = RAIL_ROWS + maxBottomRel + 1;
   // zones: ribbon at the very top; the pipeline centered in the region between the
   // ribbon and the bottom band stack; HUD anchored at the bottom.
-  const bottomBandRows = 0; // grows as bands are added (Tasks 7-9)
+  const ECONOMY_ROWS = 1;
+  const bottomBandRows = ECONOMY_ROWS; // grows further in Tasks 8-9
   const regionTop = TOP + RIBBON_ROWS;
   const regionBottom = hudTop - sublaneRows - bottomBandRows;
   const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
@@ -291,6 +294,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           sy += 1;
           flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
         }
+        drawEconomy(buffer, LEFT, hudTop - ECONOMY_ROWS, tokens, width, height);
         drawHud(buffer, flow, status, tempo, total, cursor, width, height);
       }}
     />
