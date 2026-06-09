@@ -7,6 +7,8 @@ import { theme, TRANSPARENT } from "../theme";
 import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
 import { iconFor } from "../icons";
 import { put, drawStr, clip, laneHexOf } from "./lens/draw";
+import { detectLensFromBeats } from "../../core/lens";
+import { drawPhaseRibbon } from "./lens/phaseRibbon";
 
 interface Props {
   presented: Beat[];
@@ -114,6 +116,9 @@ function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: 
 
 export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
+  const lensState = detectLensFromBeats(presented.slice(0, cursor));
+  const ribbonOn = lensState.lensId === "superpowers";
+  const RIBBON_ROWS = ribbonOn ? 2 : 0; // ribbon row + 1 spacer
   // Pulse tracks TIMELINE MOVEMENT, not the session's live status. `animate`
   // (shouldAnimate) is already true only while the cursor is advancing (live
   // reveal/replay) and false at rest/paused/scrub. Gating on status wrongly
@@ -151,9 +156,14 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
     maxBottomRel = Math.max(maxBottomRel, skillTopRel + CARD_H + skillN + (skillExtra > 0 ? 1 : 0));
   }
   const blockH = RAIL_ROWS + maxBottomRel + 1;
-  const blockTop = Math.max(TOP, TOP + Math.floor((hudTop - TOP - sublaneRows - blockH) / 2));
+  // zones: ribbon at the very top; the pipeline centered in the region between the
+  // ribbon and the bottom band stack; HUD anchored at the bottom.
+  const bottomBandRows = 0; // grows as bands are added (Tasks 7-9)
+  const regionTop = TOP + RIBBON_ROWS;
+  const regionBottom = hudTop - sublaneRows - bottomBandRows;
+  const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
   const top = blockTop + RAIL_ROWS;
-  const railY = blockTop; // = top - RAIL_ROWS
+  const railY = blockTop;
 
   const layout: Map<string, Rect> = coarseLayout(width, top);
   const channelY = top + CARD_H + 1;
@@ -183,6 +193,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();
+        if (ribbonOn) drawPhaseRibbon(buffer, LEFT, TOP, lensState, animating, now, width, height);
         const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
 
