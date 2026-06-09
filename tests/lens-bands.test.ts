@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { tsToX, lensTimeline } from "../src/core/lens-bands";
+import { tsToX, lensTimeline, heartbeatBuckets } from "../src/core/lens-bands";
 import type { Beat } from "../src/core/types";
 
 function beat(p: Partial<Beat>): Beat {
@@ -50,4 +50,24 @@ test("lensTimeline: cursorTs clamps to the revealed beat", () => {
   const beats = [beat({ ts: 10 }), beat({ ts: 20 }), beat({ ts: 30 })];
   expect(lensTimeline(beats, 2).range.cursorTs).toBe(20); // beats[cursor-1]
   expect(lensTimeline(beats, 0).range.cursorTs).toBe(10); // <=0 -> startTs
+});
+
+test("heartbeatBuckets: width buckets, only beats with index < cursor counted", () => {
+  const beats = [
+    beat({ kind: "thinking", ts: 0 }),
+    beat({ kind: "tool", ts: 50 }),
+    beat({ kind: "tool", ts: 100 }),
+  ];
+  const full = heartbeatBuckets(beats, 3, 10);
+  expect(full.length).toBe(10);
+  expect(full.reduce((n, b) => n + b.count, 0)).toBe(3);
+  const partial = heartbeatBuckets(beats, 1, 10);
+  expect(partial.reduce((n, b) => n + b.count, 0)).toBe(1); // only beats[0]
+});
+
+test("heartbeatBuckets: dominant kind per bucket; safe when start===end", () => {
+  const beats = [beat({ kind: "tool", ts: 5 }), beat({ kind: "tool", ts: 5 }), beat({ kind: "skill", ts: 5 })];
+  const b = heartbeatBuckets(beats, 3, 4);
+  const filled = b.find((x) => x.count > 0)!;
+  expect(filled.kind).toBe("tool"); // 2 tool vs 1 skill
 });
