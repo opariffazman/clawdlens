@@ -5,7 +5,7 @@ import { Files } from "./panels/Files";
 import { Tasks } from "./panels/Tasks";
 import { Git } from "./panels/Git";
 import { Lens } from "./panels/Lens";
-import type { Beat } from "../core/types";
+import type { Beat, BeatSnap } from "../core/types";
 import type { Commit } from "../core/types";
 import { type PanelId, PANELS } from "../core/types";
 export type { PanelId };
@@ -35,9 +35,10 @@ interface Props {
   paletteOpen: boolean;      // command palette active → overlay the CommandBox on top of the panel
   paletteQuery: string;
   paletteGhost: string;      // inline ghost completion
+  reveal: BeatSnap | null;   // cursor snapshot for the header's count-up animation
 }
 
-export function Showcase({ session, panel, presented, cursor, playerTotal, infoOn, lastAdvanceMs, intervalMs, animate, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost }: Props) {
+export function Showcase({ session, panel, presented, cursor, playerTotal, infoOn, lastAdvanceMs, intervalMs, animate, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost, reveal }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, borderStyle: "rounded", borderColor: theme.accent, backgroundColor: TRANSPARENT, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -52,7 +53,7 @@ export function Showcase({ session, panel, presented, cursor, playerTotal, infoO
   const bodyHeight = Math.max(1, height - 6 - (paletteOpen ? 3 : 0));
   return (
     <box style={{ flexGrow: 1, flexDirection: "column", backgroundColor: TRANSPARENT }}>
-      <Header session={session} panel={panel} marker={marker} />
+      <Header session={session} panel={panel} marker={marker} reveal={reveal} />
       {/* command palette sits ABOVE the panel (y-axis), pushing tabs + frame down */}
       {paletteOpen && <CommandBox query={paletteQuery} ghost={paletteGhost} width={width} />}
       <TabBar panels={PANELS} active={panel} width={width} />

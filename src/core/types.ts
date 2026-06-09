@@ -54,6 +54,11 @@ export type IconKey =
   | "bash" | "edit" | "read" | "search" | "web" | "task" | "skill"
   | "thinking" | "text" | "todo" | "result" | "tool";
 
+export interface BeatSnap {
+  cost: number;       // cumulative costUSD as of this beat
+  ctxTokens: number;  // context-window occupancy as of this beat
+}
+
 export interface Beat {
   id: string;
   ts: number;                    // ms epoch
@@ -67,6 +72,7 @@ export interface Beat {
   ok?: boolean;                  // result success (tool beats, after pairing)
   skill?: string;                // attributionSkill if present
   milestone?: "commit" | "branch"; // Bash git commit/branch-create, for Lens bloom/spark
+  snap?: BeatSnap;               // cumulative cost/ctx as of this beat (reveal animation)
 }
 
 export interface Commit {

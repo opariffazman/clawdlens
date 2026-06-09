@@ -22,7 +22,7 @@ export function createPlayer(opts: PlayerOpts = {}) {
     for (const b of beats) {
       const last = out[out.length - 1];
       if (last && last.kind === b.kind && last.label === b.label && last.lane === b.lane) {
-        out[out.length - 1] = { ...last, count: last.count + b.count };
+        out[out.length - 1] = { ...last, count: last.count + b.count, snap: b.snap ?? last.snap };
       } else {
         out.push({ ...b });
       }
