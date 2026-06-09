@@ -3,6 +3,7 @@ import { useKeyboard, useRenderer } from "@opentui/react";
 import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
+import { mergeHeaderSession } from "./headerSession";
 import { TRANSPARENT } from "./theme";
 import { shouldAnimate } from "./anim";
 import { Menu, pickerRows, helpRows } from "./Menu";
@@ -61,14 +62,17 @@ export function App({ store }: { store: Store }) {
 
   const selected = sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null;
   // The live store keeps only a 64 KB backfill window per session, which large
-  // metadata entries can fill entirely (0 beats). Fold the FULL transcript for
-  // the selected session — re-folding only on switch or new activity — and seed
-  // the player from it, the same source replay and the aggregate panels use.
-  const selectedFullBeats = useMemo(
-    () => (selected ? store.fullBeats(selected.id) : []),
+  // metadata entries can fill entirely (0 beats) and which undercounts cumulative
+  // cost. Fold the FULL transcript for the selected session — re-folding only on
+  // switch or new activity — and use it for BOTH the player's beats and the
+  // header's whole-session cost/elapsed. The same source replay + aggregate panels use.
+  const selectedFull = useMemo(
+    () => (selected ? store.fullSession(selected.id) : null),
     [selected?.id, selected?.lastActivityTs, store],
   );
-  const players = usePlayers(sessions, selected?.id ?? null, selectedFullBeats);
+  const players = usePlayers(sessions, selected?.id ?? null, selectedFull?.beats ?? []);
+  // Header cumulative fields (cost, elapsed) from the full fold; status/ctx stay live.
+  const headerSession = mergeHeaderSession(selected, selectedFull);
 
   // aggregate detail panels (lens/files/tasks/git) read the FULL session, not just the live window
   useEffect(() => {
@@ -229,7 +233,7 @@ export function App({ store }: { store: Store }) {
           panel (Showcase renders it), so the panel stays visible beneath. */}
       {!picker.open && !showHelp && (
         <Showcase
-          session={selected}
+          session={headerSession}
           panel={panel}
           presented={activePlayer ? activePlayer.presented() : []}
           cursor={cursor}
