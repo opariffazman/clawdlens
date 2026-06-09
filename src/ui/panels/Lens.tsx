@@ -240,7 +240,9 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         const trail = flow.main.trail;
         for (let i = 0; i + 1 < trail.length; i++) {
           const from = trail[i]!, to = trail[i + 1]!;
-          if (expanded && isReturn(from, to)) continue;
+          // hide the U-return when the tool stack uses that space, OR when its
+          // channel would reach the bottom region (bands/HUD) at short heights.
+          if (isReturn(from, to) && (expanded || channelY >= regionBottom)) continue;
           const cells = wireFor(from, to, layout, channelY, railY);
           if (cells.length === 0) continue;
           const isComet = i === trail.length - 2 && animating;
