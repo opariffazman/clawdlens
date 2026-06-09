@@ -11,6 +11,7 @@ import { detectLensFromBeats } from "../../core/lens";
 import { drawPhaseRibbon } from "./lens/phaseRibbon";
 import { drawEconomy } from "./lens/economy";
 import { drawHeartbeat } from "./lens/heartbeat";
+import { drawSkillTimeline } from "./lens/skillTimeline";
 
 interface Props {
   presented: Beat[];
@@ -163,7 +164,9 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   // ribbon and the bottom band stack; HUD anchored at the bottom.
   const ECONOMY_ROWS = 1;
   const HEARTBEAT_ROWS = 1;
-  const bottomBandRows = ECONOMY_ROWS + HEARTBEAT_ROWS; // grows further in Task 9
+  const hasTimeline = lensState.skillGroups.length > 0 || presented.slice(0, cursor).some((b) => b.iconKey === "task");
+  const TIMELINE_ROWS = hasTimeline ? 3 : 0;
+  const bottomBandRows = ECONOMY_ROWS + HEARTBEAT_ROWS + TIMELINE_ROWS;
   const regionTop = TOP + RIBBON_ROWS;
   const regionBottom = hudTop - sublaneRows - bottomBandRows;
   const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
@@ -296,6 +299,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           sy += 1;
           flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
         }
+        if (TIMELINE_ROWS > 0) drawSkillTimeline(buffer, LEFT, hudTop - ECONOMY_ROWS - HEARTBEAT_ROWS - TIMELINE_ROWS, width - LEFT - 2, presented, cursor, height);
         drawHeartbeat(buffer, LEFT, hudTop - ECONOMY_ROWS - HEARTBEAT_ROWS, width - LEFT - 2, presented, cursor, height);
         drawEconomy(buffer, LEFT, hudTop - ECONOMY_ROWS, tokens, width, height);
         drawHud(buffer, flow, status, tempo, total, cursor, width, height);
