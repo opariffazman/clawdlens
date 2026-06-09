@@ -154,28 +154,40 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const sublaneRows = flow.agentsLive > 0 ? Math.min(3, flow.agentsLive) + 1 : 0;
   const toolN = toolChildKinds.length;
   const skillN = skillChildKinds.length;
-  let maxBottomRel = CARD_H + toolN + (toolExtra > 0 ? 1 : 0);
+  // pipeline block height WITH and WITHOUT the (optional) skill card+branch.
+  const maxBottomRelNoSkill = CARD_H + toolN + (toolExtra > 0 ? 1 : 0);
+  let maxBottomRelFull = maxBottomRelNoSkill;
   if (hasSkill) {
     const skillTopRel = wide ? (CARD_H + ROW_GAP) : (CARD_H + toolN + (toolExtra > 0 ? 1 : 0) + ROW_GAP);
-    maxBottomRel = Math.max(maxBottomRel, skillTopRel + CARD_H + skillN + (skillExtra > 0 ? 1 : 0));
+    maxBottomRelFull = Math.max(maxBottomRelFull, skillTopRel + CARD_H + skillN + (skillExtra > 0 ? 1 : 0));
   }
-  const blockH = RAIL_ROWS + maxBottomRel + 1;
-  // zones: ribbon at the very top; the pipeline centered in the region between the
-  // ribbon and the bottom band stack; HUD anchored at the bottom.
+  const pipeFull = RAIL_ROWS + maxBottomRelFull + 1;   // rail + cards + skill card + return
+  const pipeCore = RAIL_ROWS + maxBottomRelNoSkill + 1; // rail + cards + return (skill suppressed)
+  // zones: ribbon (top) + pipeline + bottom bands + HUD. When height is tight, drop
+  // in priority order — economy -> heartbeat -> timeline -> ribbon -> skill card —
+  // until the pipeline + HUD fit, so they never overlap.
   const ECONOMY_ROWS = 1;
   const HEARTBEAT_ROWS = 1;
   const hasTimeline = lensState.skillGroups.length > 0 || presented.slice(0, cursor).some((b) => b.iconKey === "task");
   const TIMELINE_ROWS = hasTimeline ? 3 : 0;
-  // drop bottom bands (economy -> heartbeat -> timeline) until the pipeline + HUD fit.
-  const MIN_PIPELINE = RAIL_ROWS + CARD_H + 2; // rail + cards + return channel
-  const avail = hudTop - (TOP + RIBBON_ROWS) - sublaneRows;
-  let econ = ECONOMY_ROWS, heart = HEARTBEAT_ROWS, time = TIMELINE_ROWS;
-  while (avail - (econ + heart + time) < MIN_PIPELINE) {
-    if (econ) econ = 0; else if (heart) heart = 0; else if (time) time = 0; else break;
+  const usable = hudTop - TOP - sublaneRows;
+  let ribbon = RIBBON_ROWS, econ = ECONOMY_ROWS, heart = HEARTBEAT_ROWS, time = TIMELINE_ROWS, skill = hasSkill ? 1 : 0;
+  const pipeNeed = () => (skill ? pipeFull : pipeCore);
+  while (usable - ribbon - (econ + heart + time) < pipeNeed()) {
+    if (econ) econ = 0;
+    else if (heart) heart = 0;
+    else if (time) time = 0;
+    else if (ribbon) ribbon = 0;
+    else if (skill) skill = 0;
+    else break;
   }
+  const showRibbon = ribbon > 0;
   const showEconomy = econ > 0, showHeartbeat = heart > 0, showTimeline = time > 0 && TIMELINE_ROWS > 0;
+  const showSkillCard = hasSkill && skill > 0;
+  const maxBottomRel = showSkillCard ? maxBottomRelFull : maxBottomRelNoSkill;
+  const blockH = RAIL_ROWS + maxBottomRel + 1;
   const bottomBandRows = econ + heart + time;
-  const regionTop = TOP + RIBBON_ROWS;
+  const regionTop = TOP + ribbon;
   const regionBottom = hudTop - sublaneRows - bottomBandRows;
   const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
   const top = blockTop + RAIL_ROWS;
@@ -197,7 +209,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const skillChildRects = hasSkill ? expandStack(skillRect, skillN) : [];
 
   const presentKinds = [...COARSE_STAGES];
-  if (hasSkill) presentKinds.push("skill");
+  if (showSkillCard) presentKinds.push("skill");
 
   const cardRects = COARSE_STAGES.map((k) => layout.get(k)!); // the four coarse cards tapped by the rail
 
@@ -209,7 +221,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();
-        if (ribbonOn) drawPhaseRibbon(buffer, LEFT, TOP, lensState, animating, now, width, height);
+        if (showRibbon) drawPhaseRibbon(buffer, LEFT, TOP, lensState, animating, now, width, height);
         const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
 
@@ -223,7 +235,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         // static forward bus: the flow rail above the cards (with per-card stubs)
         for (const c of railCells(cardRects, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
         // static skill branch elbow (below tool)
-        if (hasSkill) for (const c of wireFor("tool", "skill", layout, channelY, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+        if (showSkillCard) for (const c of wireFor("tool", "skill", layout, channelY, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
 
         const trail = flow.main.trail;
         for (let i = 0; i + 1 < trail.length; i++) {
@@ -280,7 +292,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         }
 
         // skill vertical expansion (#9)
-        if (hasSkill && skillN > 0) {
+        if (showSkillCard && skillN > 0) {
           for (const c of pipeBranch(skillRect, skillChildRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
           skillChildKinds.forEach((k, i) => {
             const r = skillChildRects[i]!;
