@@ -11,12 +11,6 @@ export const CARD_H = 3;
 export const ARROW_GAP = 4;  // horizontal space between cards (carries the wire)
 export const ROW_GAP = 2;    // vertical gap between card rows
 
-// coarse: each stage on its fixed slot, rendered as a card box
-export function coarseCardRect(kind: PipeKind): Rect {
-  const { col, row } = slotOf(kind);
-  return { x: LEFT + col * (CARD_W + ARROW_GAP), y: TOP + row * (CARD_H + ROW_GAP), w: CARD_W, h: CARD_H };
-}
-
 export const MAX_CARD_W = 18;
 
 // Width-aware coarse layout: think · tool · result · chat justified across the

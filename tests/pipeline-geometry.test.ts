@@ -1,20 +1,10 @@
 import { test, expect } from "bun:test";
-import { coarseCardRect, coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
 import type { PipeKind } from "../src/core/pipeline";
 
-test("coarseCardRect places cards on fixed slots", () => {
-  const think = coarseCardRect("think");
-  const tool = coarseCardRect("tool");
-  expect(think.x).toBe(LEFT);
-  expect(think.y).toBe(TOP);
-  expect(tool.x).toBeGreaterThan(think.x);
-  expect(coarseCardRect("result").x).toBeGreaterThan(tool.x);
-  expect(coarseCardRect("skill").y).toBeGreaterThan(think.y);
-});
-
 test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at the target port", () => {
-  const a = coarseCardRect("think");
-  const b = coarseCardRect("tool");
+  const a = { x: 2, y: 1, w: 13, h: 3 };
+  const b = { x: 25, y: 1, w: 13, h: 3 };
   const cells = pipeForward(a, b);
   const my = a.y + (a.h >> 1);
   expect(cells.every((c) => c.y === my)).toBe(true);
@@ -25,8 +15,8 @@ test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at t
 });
 
 test("pipeReturn is a U below: corners + a left arrowhead on the channel row", () => {
-  const a = coarseCardRect("result");
-  const b = coarseCardRect("think");
+  const a = { x: 48, y: 1, w: 13, h: 3 };
+  const b = { x: 2, y: 1, w: 13, h: 3 };
   const channelY = a.y + a.h;
   const cells = pipeReturn(a, b, channelY);
   expect(cells.some((c) => c.ch === "╯")).toBe(true);
@@ -36,8 +26,8 @@ test("pipeReturn is a U below: corners + a left arrowhead on the channel row", (
 });
 
 test("pipeReturn drops a connecting stem when the channel is below the card bottom", () => {
-  const a = coarseCardRect("result");
-  const b = coarseCardRect("think");
+  const a = { x: 48, y: 1, w: 13, h: 3 };
+  const b = { x: 2, y: 1, w: 13, h: 3 };
   const channelY = a.y + a.h + 2; // a real channel below the cards
   const cells = pipeReturn(a, b, channelY);
   const ax = a.x + (a.w >> 1);
@@ -49,7 +39,7 @@ test("pipeReturn drops a connecting stem when the channel is below the card bott
 });
 
 test("pipeBranch trunks from the parent and tees into each child", () => {
-  const parent = coarseCardRect("tool");
+  const parent = { x: 25, y: 1, w: 13, h: 3 };
   const children = expandStack(parent, 3);
   const cells = pipeBranch(parent, children);
   expect(cells.some((c) => c.ch === "│")).toBe(true);
@@ -58,7 +48,7 @@ test("pipeBranch trunks from the parent and tees into each child", () => {
 });
 
 test("expandStack stacks n single-row child rects below the parent", () => {
-  const parent = coarseCardRect("tool");
+  const parent = { x: 25, y: 1, w: 13, h: 3 };
   const rects = expandStack(parent, 3);
   expect(rects.length).toBe(3);
   expect(rects.every((r) => r.h === 1)).toBe(true);
