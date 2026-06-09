@@ -23,14 +23,14 @@ function phaseForBeat(b: Beat): string | null {
 
 const SUPERPOWERS_SIGNAL = /superpowers|brainstorm|writing-plans|executing-plans|code-review|subagent-driven|dispatching-parallel/i;
 
-export function detectLens(s: SessionState): LensState {
+export function detectLensFromBeats(beats: Beat[]): LensState {
   const history: { phase: string; ts: number }[] = [];
   const groups: { skill: string; beatIds: string[]; ts: number }[] = [];
   let active: string | null = null;
   let sawSuperpowers = false;
   let curGroup: { skill: string; beatIds: string[]; ts: number } | null = null;
 
-  for (const b of s.beats) {
+  for (const b of beats) {
     const skill = b.skill ?? (b.kind === "skill" ? b.label : undefined);
     if (skill) {
       if (SUPERPOWERS_SIGNAL.test(skill)) sawSuperpowers = true;
@@ -49,4 +49,8 @@ export function detectLens(s: SessionState): LensState {
     phaseHistory: sawSuperpowers ? history : [],
     skillGroups: groups,
   };
+}
+
+export function detectLens(s: SessionState): LensState {
+  return detectLensFromBeats(s.beats);
 }
