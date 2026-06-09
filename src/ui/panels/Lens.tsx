@@ -127,8 +127,12 @@ function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: 
 
 export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
-  const idle = status === "idle" || status === "dormant" || status === "waiting";
-  const animating = animate && !idle;
+  // Pulse tracks TIMELINE MOVEMENT, not the session's live status. `animate`
+  // (shouldAnimate) is already true only while the cursor is advancing (live
+  // reveal/replay) and false at rest/paused/scrub. Gating on status wrongly
+  // froze the comet for past/dormant sessions being revealed — Flow/Git gate
+  // on `animate` alone; Lens now matches.
+  const animating = animate;
 
   const hasSkill = (flow.main.counts["skill"] ?? 0) > 0;
 
