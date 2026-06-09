@@ -1,4 +1,4 @@
-import type { Beat } from "./types";
+import type { Beat, SessionTokens } from "./types";
 import { detectLensFromBeats } from "./lens";
 
 export interface Span { key: string; label: string; startTs: number; endTs: number }
@@ -84,4 +84,18 @@ export function heartbeatBuckets(beats: Beat[], cursor: number, width: number): 
     buckets[i]!.kind = best;
   }
   return buckets;
+}
+
+export interface EconomyView { inTok: string; outTok: string; cachePct: number; web: number }
+
+function kfmt(n: number): string { return n >= 1000 ? Math.round(n / 1000) + "k" : String(n); }
+
+export function economyView(t: SessionTokens): EconomyView {
+  const denom = t.cacheRead + t.cacheCreate + t.input;
+  return {
+    inTok: kfmt(t.input),
+    outTok: kfmt(t.output),
+    cachePct: denom > 0 ? Math.round((t.cacheRead / denom) * 100) : 0,
+    web: t.webCalls,
+  };
 }

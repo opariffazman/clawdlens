@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
-import { tsToX, lensTimeline, heartbeatBuckets } from "../src/core/lens-bands";
+import { tsToX, lensTimeline, heartbeatBuckets, economyView } from "../src/core/lens-bands";
 import type { Beat } from "../src/core/types";
+import { newSessionTokens } from "../src/core/types";
 
 function beat(p: Partial<Beat>): Beat {
   return { id: p.id ?? "b", ts: p.ts ?? 0, kind: p.kind ?? "tool", iconKey: p.iconKey ?? "tool", label: p.label ?? "L", count: 1, lane: p.lane ?? "main", ...p };
@@ -70,4 +71,18 @@ test("heartbeatBuckets: dominant kind per bucket; safe when start===end", () => 
   const b = heartbeatBuckets(beats, 3, 4);
   const filled = b.find((x) => x.count > 0)!;
   expect(filled.kind).toBe("tool"); // 2 tool vs 1 skill
+});
+
+test("economyView: humanized in/out, cache% = cacheRead/(cacheRead+cacheCreate+input), web", () => {
+  const t = { ...newSessionTokens(), input: 12000, output: 3000, cacheRead: 90000, cacheCreate: 6000, webCalls: 2 };
+  const v = economyView(t);
+  expect(v.inTok).toBe("12k");
+  expect(v.outTok).toBe("3k");
+  expect(v.cachePct).toBe(Math.round((90000 / (90000 + 6000 + 12000)) * 100)); // 83
+  expect(v.web).toBe(2);
+});
+
+test("economyView: zero tokens -> sane zeros", () => {
+  const v = economyView(newSessionTokens());
+  expect(v).toEqual({ inTok: "0", outTok: "0", cachePct: 0, web: 0 });
 });
