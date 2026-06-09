@@ -6,6 +6,7 @@ import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
 import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
 import { iconFor } from "../icons";
+import { put, drawStr, clip, laneHexOf } from "./lens/draw";
 
 interface Props {
   presented: Beat[];
@@ -26,23 +27,9 @@ const MAX_CHILDREN = 6;
 const SKILL_SIDE_MIN = 16; // min (skill.x - tool.x) to render skill side-by-side; else stack under tool
 const COARSE_STAGES = ["think", "tool", "result", "chat"];
 const STAGE_ICON: Record<string, IconKey> = { think: "thinking", tool: "tool", skill: "skill", result: "result", chat: "text" };
-const STAGE_COL: Record<string, number> = { think: 0, tool: 1, skill: 4, result: 2, chat: 3 };
 
-function laneHexOf(kind: string) {
-  const col = STAGE_COL[kind] ?? (kind.charCodeAt(0) % theme.laneColors.length);
-  return theme.laneColors[col % theme.laneColors.length]!;
-}
-function clip(s: string, n: number) { return s.length > n ? s.slice(0, Math.max(0, n - 1)) + "…" : s; }
 function statusHex(s: Status) {
   return s === "error" ? theme.err : s === "waiting" ? theme.warn : s === "idle" || s === "dormant" ? theme.dim : theme.ok;
-}
-
-function put(buf: OptimizedBuffer, x: number, y: number, ch: string, fg: RGBA, w: number, h: number) {
-  if (x < 0 || x >= w || y < 0 || y >= h) return;
-  buf.setCell(x, y, ch, fg, TRANSPARENT);
-}
-function drawStr(buf: OptimizedBuffer, x: number, y: number, s: string, fg: RGBA, w: number, h: number) {
-  for (let i = 0; i < s.length; i++) put(buf, x + i, y, s[i]!, fg, w, h);
 }
 
 function drawCard(buf: OptimizedBuffer, r: Rect, icon: string, name: string, content: string, contentFg: RGBA, border: RGBA, active: boolean, w: number, h: number) {
