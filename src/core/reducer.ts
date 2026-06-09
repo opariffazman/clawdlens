@@ -44,7 +44,12 @@ function fileOf(input: Record<string, unknown> | undefined): string | undefined 
 function nextBeatId(s: SessionState): string { s.beatSeq += 1; return `${s.id}:${s.beatSeq}`; }
 
 function pushBeat(s: SessionState, b: Omit<import("./types").Beat, "id" | "count">): void {
-  s.beats = [...s.beats, { ...b, id: nextBeatId(s), count: 1 }];
+  // Stamp the running cumulative cost + context occupancy as of this beat. All
+  // beats are pushed inside foldAssistant AFTER this entry's usage is folded, so
+  // the snapshot reflects the totals at this point in the timeline. The header
+  // reads the snapshot at the cursor to count up cost/ctx during the reveal.
+  const snap = { cost: s.costUSD, ctxTokens: s.tokens.contextTokens };
+  s.beats = [...s.beats, { ...b, id: nextBeatId(s), count: 1, snap }];
 }
 
 function laneFor(e: Entry, s: SessionState): string {
