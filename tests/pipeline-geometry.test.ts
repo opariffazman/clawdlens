@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { coarseCardRect, coarseLayout, pipeForward, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { coarseCardRect, coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
 import type { PipeKind } from "../src/core/pipeline";
 
 test("coarseCardRect places cards on fixed slots", () => {
@@ -19,6 +19,7 @@ test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at t
   const my = a.y + (a.h >> 1);
   expect(cells.every((c) => c.y === my)).toBe(true);
   expect(cells.every((c) => c.x >= a.x + a.w && c.x < b.x)).toBe(true);
+  expect(cells.slice(0, -1).every((c) => c.ch === "━")).toBe(true); // heavy run
   expect(cells[cells.length - 1]!.ch).toBe("▶");
   expect(cells[cells.length - 1]!.x).toBe(b.x - 1);
 });
@@ -98,4 +99,27 @@ test("coarseLayout keeps the skill card from overlapping tool at narrow widths",
   const m = coarseLayout(80, TOP);
   const skill = m.get("skill")!, tool = m.get("tool")!;
   expect(skill.x).toBeGreaterThanOrEqual(tool.x + tool.w);
+});
+
+test("pipeElbow routes down the parent's right edge then into the child's left port", () => {
+  const a = { x: 2, y: 1, w: 13, h: 3 };
+  const b = { x: 40, y: 6, w: 13, h: 3 };
+  const cells = pipeElbow(a, b);
+  const by = b.y + (b.h >> 1); // child mid-row — the turn happens here
+  expect(cells.some((c) => c.ch === "│" && c.x === a.x + a.w - 1)).toBe(true); // stem on a's right edge
+  expect(cells.some((c) => c.ch === "╰" && c.x === a.x + a.w - 1 && c.y === by)).toBe(true); // corner on the turn-row
+  expect(cells.filter((c) => c.ch === "─").every((c) => c.y === by)).toBe(true); // horizontal run on the turn-row
+  expect(cells[cells.length - 1]!.ch).toBe("▶");
+  expect(cells[cells.length - 1]!.x).toBe(b.x - 1);                            // arrow at b's left port
+  expect(cells[cells.length - 1]!.y).toBe(by);                                // arrow on the turn-row
+});
+
+test("pipeElbow drops a left-trunk stem when the child sits directly below", () => {
+  const a = { x: 2, y: 1, w: 13, h: 3 };
+  const b = { x: 2, y: 9, w: 13, h: 3 };
+  const cells = pipeElbow(a, b);
+  const cx = a.x + 1; // left trunk, collinear with pipeBranch — clears left-aligned child labels
+  expect(cells.every((c) => c.x === cx)).toBe(true);
+  expect(cells[cells.length - 1]!.ch).toBe("▼");
+  expect(cells[cells.length - 1]!.y).toBe(b.y);
 });

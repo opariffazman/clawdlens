@@ -49,7 +49,7 @@ export function coarseLayout(width: number, top: number): Map<PipeKind, Rect> {
 export function pipeForward(a: Rect, b: Rect): Cell[] {
   const y = a.y + (a.h >> 1);
   const cells: Cell[] = [];
-  for (let x = a.x + a.w; x < b.x - 1; x++) cells.push({ x, y, ch: "─" });
+  for (let x = a.x + a.w; x < b.x - 1; x++) cells.push({ x, y, ch: "━" });
   cells.push({ x: b.x - 1, y, ch: "▶" });
   return cells;
 }
@@ -81,6 +81,29 @@ export function pipeBranch(parent: Rect, children: Rect[]): Cell[] {
     cells.push({ x: tx, y: c.y, ch: c === last ? "└" : "├" });
     for (let x = tx + 1; x < c.x - 1; x++) cells.push({ x, y: c.y, ch: "─" });
     cells.push({ x: c.x - 1, y: c.y, ch: "▶" });
+  }
+  return cells;
+}
+
+// branch a parent to a child that hangs below it. If the child is to the
+// lower-right (own sub-column), route down the parent's right edge, corner,
+// then right into the child's left-mid port. If the child sits directly below
+// (narrow fallback), drop a centered vertical stem into the child's top port.
+export function pipeElbow(a: Rect, b: Rect): Cell[] {
+  const cells: Cell[] = [];
+  // wide route — child below-right. Callers keep a real gap (b.x > a.x+a.w) via
+  // SKILL_SIDE_MIN; an exactly-adjacent child would collapse the corner onto the arrow.
+  if (b.x >= a.x + a.w) {
+    const ex = a.x + a.w - 1;
+    const by = b.y + (b.h >> 1);
+    for (let y = a.y + a.h; y < by; y++) cells.push({ x: ex, y, ch: "│" });
+    cells.push({ x: ex, y: by, ch: "╰" });
+    for (let x = ex + 1; x < b.x - 1; x++) cells.push({ x, y: by, ch: "─" });
+    cells.push({ x: b.x - 1, y: by, ch: "▶" });
+  } else {
+    const cx = a.x + 1; // left trunk (collinear with pipeBranch) — clears left-aligned child labels
+    for (let y = a.y + a.h; y < b.y; y++) cells.push({ x: cx, y, ch: "│" });
+    cells.push({ x: cx, y: b.y, ch: "▼" });
   }
   return cells;
 }
