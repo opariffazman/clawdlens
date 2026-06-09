@@ -39,6 +39,15 @@ Replace the fixed-slot `coarseCardRect(kind)` with a width-aware layout function
 
 No curved/bezier pipes — Manhattan routing only, as before.
 
+### 2a. Addendum — flow rail above (supersedes the mid-row gap arrows)
+
+Mid-row gap arrows still read as a line threading *through* the transparent cards (a horizontal run at any row visually continues across the boxes). To make the forward flow unambiguously route *around* the nodes, forward connectors move OFF the card row onto a dedicated **flow rail above the card block**:
+
+- `railCells(cards, railY)` — one horizontal bus on `railY` (two rows above the card row) across all four cards' stub columns, a `┯` tee per card, a short `│` stub down toward each card, `●` at the left origin and `▶` at the right terminus. Drawn dim as the static baseline.
+- `railSegment(a, b, railY)` — the ordered horizontal run between two cards' stub columns; the comet rides this for the active forward transition.
+- **Dynamic drop arrow:** the currently-active coarse card gets a lit, breathing `▼` dropping from the rail into its top — the rail "taps down" into whichever stage is live. (Non-active cards keep a plain dim stub.)
+- `pipeForward` is retired from the panel (forward flow is the rail); the U-return stays in its channel below, and the skill branch keeps its `pipeElbow` below. Content rows are now completely clear of horizontal pipes — nothing crosses a box. The card block reserves two rows above for the rail in its vertical centering.
+
 ## 3. Skill-stage expand (issue #9)
 
 ### Data (`pipeline-flow.ts`)

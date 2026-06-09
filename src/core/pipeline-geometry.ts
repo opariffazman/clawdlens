@@ -101,6 +101,39 @@ export function pipeElbow(a: Rect, b: Rect): Cell[] {
   return cells;
 }
 
+// a card taps the flow rail from its top-center.
+function railStubX(card: Rect): number { return card.x + (card.w >> 1); }
+
+// flow rail ABOVE the card row: one horizontal bus across all the cards' stub
+// columns (┯ tee per card), a short │ stub down toward each card, ● at the left
+// origin and ▶ at the right terminus. Forward flow rides the bus instead of
+// threading through the boxes at content height.
+export function railCells(cards: Rect[], railY: number): Cell[] {
+  const cells: Cell[] = [];
+  if (cards.length === 0) return cells;
+  const xs = cards.map(railStubX).sort((a, b) => a - b);
+  const x0 = xs[0]!, x1 = xs[xs.length - 1]!;
+  const stub = new Set(xs);
+  cells.push({ x: x0 - 1, y: railY, ch: "●" });
+  for (let x = x0; x <= x1; x++) cells.push({ x, y: railY, ch: stub.has(x) ? "┯" : "━" });
+  cells.push({ x: x1 + 1, y: railY, ch: "▶" });
+  for (const c of cards) {
+    const sx = railStubX(c);
+    for (let y = railY + 1; y < c.y; y++) cells.push({ x: sx, y, ch: "│" });
+  }
+  return cells;
+}
+
+// ordered horizontal run along the rail between two cards' stub columns (a→b),
+// for the comet. Cells flow from a's stub toward b's stub.
+export function railSegment(a: Rect, b: Rect, railY: number): Cell[] {
+  const ax = railStubX(a), bx = railStubX(b);
+  const lo = Math.min(ax, bx), hi = Math.max(ax, bx);
+  const cells: Cell[] = [];
+  for (let x = lo; x <= hi; x++) cells.push({ x, y: railY, ch: "━" });
+  return ax <= bx ? cells : cells.reverse();
+}
+
 // vertical stack of n single-row child slots below the parent card
 export function expandStack(parent: Rect, n: number): Rect[] {
   const rects: Rect[] = [];

@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, railCells, railSegment, LEFT, TOP } from "../src/core/pipeline-geometry";
 import type { PipeKind } from "../src/core/pipeline";
 
 test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at the target port", () => {
@@ -112,4 +112,36 @@ test("pipeElbow drops a left-trunk stem when the child sits directly below", () 
   expect(cells.every((c) => c.x === cx)).toBe(true);
   expect(cells[cells.length - 1]!.ch).toBe("▼");
   expect(cells[cells.length - 1]!.y).toBe(b.y);
+});
+
+test("railCells draws a horizontal bus above the cards with a tee + stub per card", () => {
+  const cards = [
+    { x: 2, y: 5, w: 10, h: 3 },
+    { x: 20, y: 5, w: 10, h: 3 },
+  ];
+  const railY = 3;
+  const cells = railCells(cards, railY);
+  // the bus sits entirely on railY (only the stubs descend below it)
+  expect(cells.filter((c) => c.ch === "━" || c.ch === "┯" || c.ch === "●" || c.ch === "▶").every((c) => c.y === railY)).toBe(true);
+  for (const card of cards) {
+    const sx = card.x + (card.w >> 1);
+    expect(cells.some((c) => c.x === sx && c.y === railY && c.ch === "┯")).toBe(true);        // tee on the bus
+    expect(cells.some((c) => c.x === sx && c.y > railY && c.y < card.y && c.ch === "│")).toBe(true); // stub toward the card
+  }
+  expect(cells.some((c) => c.ch === "●")).toBe(true); // origin
+  expect(cells.some((c) => c.ch === "▶")).toBe(true); // terminus
+});
+
+test("railSegment is an ordered horizontal run between two cards' stub columns", () => {
+  const a = { x: 2, y: 5, w: 10, h: 3 };  // stubX = 7
+  const b = { x: 20, y: 5, w: 10, h: 3 }; // stubX = 25
+  const railY = 3;
+  const cells = railSegment(a, b, railY);
+  expect(cells.every((c) => c.y === railY && c.ch === "━")).toBe(true);
+  expect(cells[0]!.x).toBe(7);                  // flows from a's stub
+  expect(cells[cells.length - 1]!.x).toBe(25);  // to b's stub
+  // reversed when b is left of a
+  const rev = railSegment(b, a, railY);
+  expect(rev[0]!.x).toBe(25);
+  expect(rev[rev.length - 1]!.x).toBe(7);
 });

@@ -1,6 +1,6 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
-import { coarseLayout, pipeForward, pipeReturn, pipeBranch, pipeElbow, expandStack, type Rect, type Cell, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
+import { coarseLayout, pipeReturn, pipeBranch, pipeElbow, expandStack, railCells, railSegment, type Rect, type Cell, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
 import { rankOf } from "../../core/pipeline";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
@@ -115,12 +115,12 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
 }
 
 // pick the routed pipe for a transition between two coarse kinds
-function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: number): Cell[] {
+function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: number, railY: number): Cell[] {
   const a = layout.get(from); const b = layout.get(to);
   if (!a || !b) return [];
   if (to === "skill") return pipeElbow(a, b);
   if (from === "skill") return pipeElbow(b, a).reverse();
-  if (a.y === b.y && b.x > a.x) return pipeForward(a, b);
+  if (a.y === b.y && b.x > a.x) return railSegment(a, b, railY); // forward flow rides the rail above
   if (a.y === b.y && b.x < a.x) return pipeReturn(a, b, channelY);
   return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse();
 }
@@ -146,7 +146,9 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const probe: Map<string, Rect> = coarseLayout(width, TOP);
   const wide = (probe.get("skill")!.x - probe.get("tool")!.x) >= SKILL_SIDE_MIN;
 
-  // vertical centering: estimate the block height, center between TOP and the HUD band
+  // vertical centering: estimate the block height (flow rail above + cards/expands),
+  // center it between TOP and the HUD band, reserving the sublane rows below.
+  const RAIL_ROWS = 2; // flow rail + a stub row above the card row
   const bandH = 4;
   const hudTop = height - bandH;
   const sublaneRows = flow.agentsLive > 0 ? Math.min(3, flow.agentsLive) + 1 : 0;
@@ -157,8 +159,10 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
     const skillTopRel = wide ? (CARD_H + ROW_GAP) : (CARD_H + toolN + (toolExtra > 0 ? 1 : 0) + ROW_GAP);
     maxBottomRel = Math.max(maxBottomRel, skillTopRel + CARD_H + skillN + (skillExtra > 0 ? 1 : 0));
   }
-  const blockH = maxBottomRel + 2;
-  const top = Math.max(TOP, TOP + Math.floor((hudTop - TOP - sublaneRows - blockH) / 2));
+  const blockH = RAIL_ROWS + maxBottomRel + 1;
+  const blockTop = Math.max(TOP, TOP + Math.floor((hudTop - TOP - sublaneRows - blockH) / 2));
+  const top = blockTop + RAIL_ROWS;
+  const railY = blockTop; // = top - RAIL_ROWS
 
   const layout: Map<string, Rect> = coarseLayout(width, top);
   const channelY = top + CARD_H + 1;
@@ -178,8 +182,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const presentKinds = [...COARSE_STAGES];
   if (hasSkill) presentKinds.push("skill");
 
-  const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
-  if (hasSkill) backbone.push(["tool", "skill"]);
+  const cardRects = COARSE_STAGES.map((k) => layout.get(k)!); // the four coarse cards tapped by the rail
 
   return (
     <box
@@ -199,24 +202,40 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           return !!a && !!b && a.y === b.y && b.x < a.x;
         };
 
-        for (const [a, b] of backbone) {
-          if (expanded && isReturn(a, b)) continue;
-          for (const c of wireFor(a, b, layout, channelY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-        }
+        // static forward bus: the flow rail above the cards (with per-card stubs)
+        for (const c of railCells(cardRects, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+        // static skill branch elbow (below tool)
+        if (hasSkill) for (const c of wireFor("tool", "skill", layout, channelY, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
 
         const trail = flow.main.trail;
         for (let i = 0; i + 1 < trail.length; i++) {
-          if (expanded && isReturn(trail[i]!, trail[i + 1]!)) continue;
-          const cells = wireFor(trail[i]!, trail[i + 1]!, layout, channelY);
+          const from = trail[i]!, to = trail[i + 1]!;
+          if (expanded && isReturn(from, to)) continue;
+          const cells = wireFor(from, to, layout, channelY, railY);
           if (cells.length === 0) continue;
-          const laneHex = laneHexOf(trail[i + 1]!);
-          if (i === trail.length - 2 && animating) {
+          const isComet = i === trail.length - 2 && animating;
+          const a = layout.get(from), b = layout.get(to);
+          const isRailFwd = !!a && !!b && a.y === b.y && b.x > a.x;
+          if (isRailFwd && !isComet) continue; // static rail already draws it — don't clobber the tees
+          const laneHex = laneHexOf(to);
+          if (isComet) {
             const head = phase * cells.length;
             cells.forEach((c, ci) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(cometColor(head - ci, TAIL, flow.main.errored ? theme.err : laneHex, theme.pulseHot, theme.wireDim, 0.2 + 0.3 * tempo)), width, height));
           } else {
             const baseI = 0.2 + 0.3 * ((i + 1) / Math.max(1, trail.length - 1));
             cells.forEach((c) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(lerpHex(theme.wireDim, laneHex, baseI)), width, height));
           }
+        }
+
+        // dynamic drop arrow: the rail taps DOWN into the currently-active card
+        const activeK = flow.main.activeKind;
+        if (activeK && COARSE_STAGES.includes(activeK)) {
+          const r = layout.get(activeK)!;
+          const sx = r.x + (r.w >> 1);
+          const dropCol = RGBA.fromHex(flow.main.errored ? theme.err : (animating ? lerpHex(laneHexOf(activeK), theme.pulseHot, breathe(now)) : laneHexOf(activeK)));
+          put(buffer, sx, railY, "┯", dropCol, width, height);
+          for (let y = railY + 1; y < r.y - 1; y++) put(buffer, sx, y, "│", dropCol, width, height);
+          put(buffer, sx, r.y - 1, "▼", dropCol, width, height);
         }
 
         for (const k of presentKinds) {
