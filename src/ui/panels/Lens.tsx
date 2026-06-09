@@ -10,6 +10,7 @@ import { put, drawStr, clip, laneHexOf } from "./lens/draw";
 import { detectLensFromBeats } from "../../core/lens";
 import { drawPhaseRibbon } from "./lens/phaseRibbon";
 import { drawEconomy } from "./lens/economy";
+import { drawHeartbeat } from "./lens/heartbeat";
 
 interface Props {
   presented: Beat[];
@@ -161,7 +162,8 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   // zones: ribbon at the very top; the pipeline centered in the region between the
   // ribbon and the bottom band stack; HUD anchored at the bottom.
   const ECONOMY_ROWS = 1;
-  const bottomBandRows = ECONOMY_ROWS; // grows further in Tasks 8-9
+  const HEARTBEAT_ROWS = 1;
+  const bottomBandRows = ECONOMY_ROWS + HEARTBEAT_ROWS; // grows further in Task 9
   const regionTop = TOP + RIBBON_ROWS;
   const regionBottom = hudTop - sublaneRows - bottomBandRows;
   const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
@@ -294,6 +296,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           sy += 1;
           flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
         }
+        drawHeartbeat(buffer, LEFT, hudTop - ECONOMY_ROWS - HEARTBEAT_ROWS, width - LEFT - 2, presented, cursor, height);
         drawEconomy(buffer, LEFT, hudTop - ECONOMY_ROWS, tokens, width, height);
         drawHud(buffer, flow, status, tempo, total, cursor, width, height);
       }}
