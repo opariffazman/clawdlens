@@ -1,5 +1,5 @@
-import type { SessionState, PanelId } from "../core/types";
-import { effectiveContextLimit } from "../core/tokens";
+import type { SessionState, PanelId, BeatSnap } from "../core/types";
+import { headerValues } from "./headerReveal";
 import { hintsFor } from "../core/chrome";
 import { theme, TRANSPARENT } from "./theme";
 import { statusGlyph, gaugeBar, fmtCost, fmtTokens } from "./format";
@@ -16,12 +16,11 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out;
 }
 
-export function Header({ session, panel, marker }: { session: SessionState; panel: PanelId; marker: string }) {
+export function Header({ session, panel, marker, reveal }: { session: SessionState; panel: PanelId; marker: string; reveal?: BeatSnap | null }) {
   const g = statusGlyph(session.status);
-  const pct = session.tokens.contextPct;
+  const { cost, ctxTokens, pct, limit } = headerValues(session, reveal ?? null);
   const pctColor = pct > 0.85 ? theme.err : pct > 0.6 ? theme.warn : theme.ok;
   const elapsed = fmtElapsed(Math.max(0, session.lastActivityTs - session.startedTs));
-  const limit = effectiveContextLimit(session.model, session.tokens.contextTokens);
   const rows = chunk(hintsFor(panel), 3);
 
   return (
@@ -35,8 +34,8 @@ export function Header({ session, panel, marker }: { session: SessionState; pane
           <text fg={theme.dim}>ctx</text>
           <text fg={pctColor}>{gaugeBar(pct, 10)}</text>
           <text fg={pctColor}>{Math.round(pct * 100) + "%"}</text>
-          <text fg={theme.dim}>{fmtTokens(session.tokens.contextTokens, limit)}</text>
-          <text fg={theme.ok}>{fmtCost(session.costUSD)}</text>
+          <text fg={theme.dim}>{fmtTokens(ctxTokens, limit)}</text>
+          <text fg={theme.ok}>{fmtCost(cost)}</text>
           <text fg={theme.dim}>{elapsed}</text>
           <text fg={theme.accent}>{marker}</text>
           {session.parseErrors > 0 && <text fg={theme.err}>{`⚠ ${session.parseErrors}`}</text>}

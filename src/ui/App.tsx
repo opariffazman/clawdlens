@@ -3,6 +3,7 @@ import { useKeyboard, useRenderer } from "@opentui/react";
 import type { createStore } from "../store/sessionStore";
 import { mapKey } from "./keymap";
 import { usePlayers } from "./usePlayers";
+import { cursorSnapshot } from "./headerReveal";
 import { mergeHeaderSession } from "./headerSession";
 import { TRANSPARENT } from "./theme";
 import { shouldAnimate } from "./anim";
@@ -91,6 +92,9 @@ export function App({ store }: { store: Store }) {
   // one shared timeline: all panels reveal in sync with the active player's cursor
   const playerTotal = activePlayer ? activePlayer.all().length : 0;
   const cursor = activePlayer ? activePlayer.cursor() : 0;
+  // Snapshot of cumulative cost/ctx at the cursor — drives the header's count-up
+  // during reveal/replay/scrub. null (no beats) -> header shows session totals.
+  const reveal = activePlayer ? cursorSnapshot(activePlayer.all(), cursor) : null;
   const progress = activePlayer && playerTotal > 0 ? cursor / playerTotal : 1;
   const lastAdvanceMs = activePlayer ? activePlayer.lastAdvanceMs() : -1;
   const intervalMs = activePlayer ? activePlayer.intervalMs() : 1000;
@@ -253,6 +257,7 @@ export function App({ store }: { store: Store }) {
           paletteOpen={palette.open}
           paletteQuery={palette.query}
           paletteGhost={paletteGhost}
+          reveal={reveal}
         />
       )}
       {picker.open && (
