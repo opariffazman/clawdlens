@@ -16,14 +16,14 @@ export function cursorSnapshot(beats: Beat[], cursor: number): BeatSnap | null {
 }
 
 // Resolve the header's displayed cost / ctx tokens / ctx pct / limit. The context
-// limit is derived from the session's FINAL ctx, so it stays constant across the
-// whole reveal: a 1M session's gauge fills smoothly 0->final% instead of resetting
-// when effectiveContextLimit flips from 200k to 1M at the 200k boundary.
+// limit is derived from the session's PEAK ctx, so it stays constant across the
+// whole reveal AND reflects the true window: a 1M run that /compact shrank below
+// 200k by the end still gauges against 1M, so a mid-run peak never reads >100%.
 export function headerValues(
   session: SessionState,
   reveal: BeatSnap | null,
 ): { cost: number; ctxTokens: number; pct: number; limit: number } {
-  const limit = effectiveContextLimit(session.model, session.tokens.contextTokens);
+  const limit = effectiveContextLimit(session.model, session.tokens.maxContextTokens);
   if (!reveal) {
     return { cost: session.costUSD, ctxTokens: session.tokens.contextTokens, pct: session.tokens.contextPct, limit };
   }

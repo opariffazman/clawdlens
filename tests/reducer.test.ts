@@ -26,6 +26,49 @@ test("harness TaskCreate/TaskUpdate reconstruct an agnostic task list", () => {
   expect(s.todos?.[1]).toEqual({ content: "Write tests", status: "in_progress" });
 });
 
+test("ctx limit is inferred from the session's PEAK ctx, not the final compacted ctx", () => {
+  const s = feed([
+    // a 1M-context run that grows past the 200k standard window...
+    { type: "assistant", message: { model: "claude-opus-4-8", usage: { input_tokens: 0, cache_read_input_tokens: 540000 } } },
+    // ...then /compact shrinks the live context back below 200k
+    { type: "assistant", message: { model: "claude-opus-4-8", usage: { input_tokens: 0, cache_read_input_tokens: 150000 } } },
+  ]);
+  expect(s.tokens.maxContextTokens).toBe(540000);
+  // 150k / 1M (peak-inferred limit), NOT the wrong 150k / 200k = 0.75
+  expect(s.tokens.contextPct).toBeCloseTo(0.15, 5);
+});
+
+test("a skill activated via attribution (no Skill tool_use) surfaces as a skill beat", () => {
+  const s = feed([
+    { type: "assistant", attributionSkill: "bootcamp-session", message: { content: [{ type: "thinking" }] } },
+  ]);
+  const skills = s.beats.filter((b) => b.kind === "skill");
+  expect(skills.length).toBe(1);
+  expect(skills[0]!.label).toBe("bootcamp-session");
+  expect(skills[0]!.skill).toBe("bootcamp-session");
+});
+
+test("a Skill tool_use is not double-counted by the attribution path", () => {
+  const s = feed([
+    { type: "assistant", message: { content: [{ type: "tool_use", id: "s1", name: "Skill", input: { skill: "bootcamp-quiz" } }] } },
+    // subsequent work attributed to the same skill must NOT emit a second skill beat
+    { type: "assistant", attributionSkill: "bootcamp-quiz", message: { content: [{ type: "thinking" }] } },
+    { type: "assistant", attributionSkill: "bootcamp-quiz", message: { content: [{ type: "text", text: "answer" }] } },
+  ]);
+  const skills = s.beats.filter((b) => b.kind === "skill");
+  expect(skills.length).toBe(1);
+  expect(skills[0]!.label).toBe("bootcamp-quiz");
+});
+
+test("switching attribution to a different skill surfaces a new skill beat (per activation)", () => {
+  const s = feed([
+    { type: "assistant", attributionSkill: "skill-a", message: { content: [{ type: "thinking" }] } },
+    { type: "assistant", attributionSkill: "skill-a", message: { content: [{ type: "thinking" }] } }, // same run, no new beat
+    { type: "assistant", attributionSkill: "skill-b", message: { content: [{ type: "thinking" }] } },
+  ]);
+  expect(s.beats.filter((b) => b.kind === "skill").map((b) => b.label)).toEqual(["skill-a", "skill-b"]);
+});
+
 test("identity, title, prompt, model and tokens fold in", () => {
   const s = feed([
     { type: "ai-title", aiTitle: "Fix the thing" },

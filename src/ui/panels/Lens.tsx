@@ -1,11 +1,17 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
-import { coarseCardRect, pipeForward, pipeReturn, pipeBranch, expandStack, type Rect, type Cell, LEFT, TOP, CARD_H } from "../../core/pipeline-geometry";
+import { coarseLayout, pipeReturn, pipeBranch, pipeElbow, expandStack, railCells, railSegment, type Rect, type Cell, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
 import { rankOf } from "../../core/pipeline";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
 import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
 import { iconFor } from "../icons";
+import { put, drawStr, clip, laneHexOf } from "./lens/draw";
+import { detectLensFromBeats } from "../../core/lens";
+import { drawPhaseRibbon } from "./lens/phaseRibbon";
+import { drawEconomy } from "./lens/economy";
+import { drawHeartbeat } from "./lens/heartbeat";
+import { drawSkillTimeline } from "./lens/skillTimeline";
 
 interface Props {
   presented: Beat[];
@@ -16,6 +22,7 @@ interface Props {
   intervalMs: number;
   status: Status;
   infoOn: boolean;
+  tokens: import("../../core/types").SessionTokens;
   width: number;
   height: number;
 }
@@ -23,25 +30,12 @@ interface Props {
 const TRAIL_HOPS = 3;
 const TAIL = 6;
 const MAX_CHILDREN = 6;
+const SKILL_SIDE_MIN = 16; // min (skill.x - tool.x) to render skill side-by-side; else stack under tool
 const COARSE_STAGES = ["think", "tool", "result", "chat"];
 const STAGE_ICON: Record<string, IconKey> = { think: "thinking", tool: "tool", skill: "skill", result: "result", chat: "text" };
-const STAGE_COL: Record<string, number> = { think: 0, tool: 1, skill: 1, result: 2, chat: 3 };
 
-function laneHexOf(kind: string) {
-  const col = STAGE_COL[kind] ?? (kind.charCodeAt(0) % theme.laneColors.length);
-  return theme.laneColors[col % theme.laneColors.length]!;
-}
-function clip(s: string, n: number) { return s.length > n ? s.slice(0, Math.max(0, n - 1)) + "…" : s; }
 function statusHex(s: Status) {
   return s === "error" ? theme.err : s === "waiting" ? theme.warn : s === "idle" || s === "dormant" ? theme.dim : theme.ok;
-}
-
-function put(buf: OptimizedBuffer, x: number, y: number, ch: string, fg: RGBA, w: number, h: number) {
-  if (x < 0 || x >= w || y < 0 || y >= h) return;
-  buf.setCell(x, y, ch, fg, TRANSPARENT);
-}
-function drawStr(buf: OptimizedBuffer, x: number, y: number, s: string, fg: RGBA, w: number, h: number) {
-  for (let i = 0; i < s.length; i++) put(buf, x + i, y, s[i]!, fg, w, h);
 }
 
 function drawCard(buf: OptimizedBuffer, r: Rect, icon: string, name: string, content: string, contentFg: RGBA, border: RGBA, active: boolean, w: number, h: number) {
@@ -114,34 +108,110 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
 }
 
 // pick the routed pipe for a transition between two coarse kinds
-function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: number): Cell[] {
+function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: number, railY: number): Cell[] {
   const a = layout.get(from); const b = layout.get(to);
   if (!a || !b) return [];
-  if (a.y === b.y && b.x > a.x) return pipeForward(a, b);
+  if (to === "skill") return pipeElbow(a, b);
+  if (from === "skill") return pipeElbow(b, a).reverse();
+  if (a.y === b.y && b.x > a.x) return railSegment(a, b, railY); // forward flow rides the rail above
   if (a.y === b.y && b.x < a.x) return pipeReturn(a, b, channelY);
-  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse(); // reverse so the comet rides a→b (upward)
+  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse();
 }
 
-export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
+export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, tokens, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
-  const idle = status === "idle" || status === "dormant" || status === "waiting";
-  const animating = animate && !idle;
+  const lensState = detectLensFromBeats(presented.slice(0, cursor));
+  const ribbonOn = lensState.lensId === "superpowers";
+  const RIBBON_ROWS = ribbonOn ? 2 : 0; // ribbon row + 1 spacer
+  // Pulse tracks TIMELINE MOVEMENT, not the session's live status. `animate`
+  // (shouldAnimate) is already true only while the cursor is advancing (live
+  // reveal/replay) and false at rest/paused/scrub. Gating on status wrongly
+  // froze the comet for past/dormant sessions being revealed — Flow/Git gate
+  // on `animate` alone; Lens now matches.
+  const animating = animate;
 
-  const presentKinds = [...COARSE_STAGES];
-  const showSkill = !infoOn && (flow.main.counts["skill"] ?? 0) > 0;
-  if (showSkill) presentKinds.push("skill");
-  const layout = new Map<string, Rect>(presentKinds.map((k) => [k, coarseCardRect(k as Parameters<typeof coarseCardRect>[0])]));
-  const channelY = TOP + CARD_H + 1; // one row of clearance so the U-return has connecting legs
+  const hasSkill = (flow.main.counts["skill"] ?? 0) > 0;
 
-  const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
-  if (showSkill) backbone.push(["tool", "skill"]);
-
-  // tool vertical expansion (i): per-action child cards stacked under the tool card
-  const toolRect = layout.get("tool")!;
-  const childKinds = infoOn
+  // expand child kinds (i): tool by rank, skill by count desc then name
+  const toolChildKinds = infoOn
     ? Object.keys(flow.main.toolBreakdown).sort((a, b) => rankOf(a) - rankOf(b)).slice(0, MAX_CHILDREN)
     : [];
-  const childRects = expandStack(toolRect, childKinds.length);
+  const skillChildKinds = infoOn && hasSkill
+    ? Object.keys(flow.main.skillBreakdown).sort((a, b) => (flow.main.skillBreakdown[b]! - flow.main.skillBreakdown[a]!) || (a < b ? -1 : 1)).slice(0, MAX_CHILDREN)
+    : [];
+  const toolExtra = infoOn ? Object.keys(flow.main.toolBreakdown).length - toolChildKinds.length : 0;
+  const skillExtra = infoOn ? Object.keys(flow.main.skillBreakdown).length - skillChildKinds.length : 0;
+
+  // wide (side-by-side skill) vs narrow (skill under tool) — from the spread's gap
+  const probe: Map<string, Rect> = coarseLayout(width, TOP);
+  const wide = (probe.get("skill")!.x - probe.get("tool")!.x) >= SKILL_SIDE_MIN;
+
+  // vertical centering: estimate the block height (flow rail above + cards/expands),
+  // center it between TOP and the HUD band, reserving the sublane rows below.
+  const RAIL_ROWS = 2; // flow rail + a stub row above the card row
+  const bandH = 4;
+  const hudTop = height - bandH;
+  const sublaneRows = flow.agentsLive > 0 ? Math.min(3, flow.agentsLive) + 1 : 0;
+  const toolN = toolChildKinds.length;
+  const skillN = skillChildKinds.length;
+  // pipeline block height WITH and WITHOUT the (optional) skill card+branch.
+  const maxBottomRelNoSkill = CARD_H + toolN + (toolExtra > 0 ? 1 : 0);
+  let maxBottomRelFull = maxBottomRelNoSkill;
+  if (hasSkill) {
+    const skillTopRel = wide ? (CARD_H + ROW_GAP) : (CARD_H + toolN + (toolExtra > 0 ? 1 : 0) + ROW_GAP);
+    maxBottomRelFull = Math.max(maxBottomRelFull, skillTopRel + CARD_H + skillN + (skillExtra > 0 ? 1 : 0));
+  }
+  const pipeFull = RAIL_ROWS + maxBottomRelFull + 1;   // rail + cards + skill card + return
+  const pipeCore = RAIL_ROWS + maxBottomRelNoSkill + 1; // rail + cards + return (skill suppressed)
+  // zones: ribbon (top) + pipeline + bottom bands + HUD. When height is tight, drop
+  // in priority order — economy -> heartbeat -> timeline -> ribbon -> skill card —
+  // until the pipeline + HUD fit, so they never overlap.
+  const ECONOMY_ROWS = 1;
+  const HEARTBEAT_ROWS = 1;
+  const hasTimeline = lensState.skillGroups.length > 0 || presented.slice(0, cursor).some((b) => b.iconKey === "task");
+  const TIMELINE_ROWS = hasTimeline ? 3 : 0;
+  const usable = hudTop - TOP - sublaneRows;
+  let ribbon = RIBBON_ROWS, econ = ECONOMY_ROWS, heart = HEARTBEAT_ROWS, time = TIMELINE_ROWS, skill = hasSkill ? 1 : 0;
+  const pipeNeed = () => (skill ? pipeFull : pipeCore);
+  while (usable - ribbon - (econ + heart + time) < pipeNeed()) {
+    if (econ) econ = 0;
+    else if (heart) heart = 0;
+    else if (time) time = 0;
+    else if (ribbon) ribbon = 0;
+    else if (skill) skill = 0;
+    else break;
+  }
+  const showRibbon = ribbon > 0;
+  const showEconomy = econ > 0, showHeartbeat = heart > 0, showTimeline = time > 0 && TIMELINE_ROWS > 0;
+  const showSkillCard = hasSkill && skill > 0;
+  const maxBottomRel = showSkillCard ? maxBottomRelFull : maxBottomRelNoSkill;
+  const blockH = RAIL_ROWS + maxBottomRel + 1;
+  const bottomBandRows = econ + heart + time;
+  const regionTop = TOP + ribbon;
+  const regionBottom = hudTop - sublaneRows - bottomBandRows;
+  const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
+  const top = blockTop + RAIL_ROWS;
+  const railY = blockTop;
+
+  const layout: Map<string, Rect> = coarseLayout(width, top);
+  const channelY = top + CARD_H + 1;
+
+  const toolRect = layout.get("tool")!;
+  const toolChildRects = expandStack(toolRect, toolN);
+  const toolBlockBottom = toolN > 0 ? toolChildRects[toolChildRects.length - 1]!.y + 1 + (toolExtra > 0 ? 1 : 0) : toolRect.y + CARD_H;
+
+  // place skill: wide → gap column (from coarseLayout); narrow → below the tool block
+  let skillRect = layout.get("skill")!;
+  if (hasSkill && !wide) {
+    skillRect = { x: toolRect.x, y: toolBlockBottom + ROW_GAP, w: toolRect.w, h: CARD_H };
+    layout.set("skill", skillRect);
+  }
+  const skillChildRects = hasSkill ? expandStack(skillRect, skillN) : [];
+
+  const presentKinds = [...COARSE_STAGES];
+  if (showSkillCard) presentKinds.push("skill");
+
+  const cardRects = COARSE_STAGES.map((k) => layout.get(k)!); // the four coarse cards tapped by the rail
 
   return (
     <box
@@ -151,35 +221,53 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();
+        if (showRibbon) drawPhaseRibbon(buffer, LEFT, TOP, lensState, animating, now, width, height);
         const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
 
-        // during the tool expansion, back-edge (loop) pipes are hidden — the child
-        // stack occupies that space; the U-return reappears when collapsed.
-        const expanded = childKinds.length > 0;
+        // while tool is expanded, hide back-edge (loop) pipes — the stack uses that space
+        const expanded = toolN > 0;
         const isReturn = (from: string, to: string) => {
           const a = layout.get(from); const b = layout.get(to);
           return !!a && !!b && a.y === b.y && b.x < a.x;
         };
 
-        for (const [a, b] of backbone) {
-          if (expanded && isReturn(a, b)) continue;
-          for (const c of wireFor(a, b, layout, channelY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-        }
+        // static forward bus: the flow rail above the cards (with per-card stubs)
+        for (const c of railCells(cardRects, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+        // static skill branch elbow (below tool)
+        if (showSkillCard) for (const c of wireFor("tool", "skill", layout, channelY, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
 
         const trail = flow.main.trail;
         for (let i = 0; i + 1 < trail.length; i++) {
-          if (expanded && isReturn(trail[i]!, trail[i + 1]!)) continue;
-          const cells = wireFor(trail[i]!, trail[i + 1]!, layout, channelY);
+          const from = trail[i]!, to = trail[i + 1]!;
+          // hide the U-return when the tool stack uses that space, OR when its
+          // channel would reach the bottom region (bands/HUD) at short heights.
+          if (isReturn(from, to) && (expanded || channelY >= regionBottom)) continue;
+          const cells = wireFor(from, to, layout, channelY, railY);
           if (cells.length === 0) continue;
-          const laneHex = laneHexOf(trail[i + 1]!);
-          if (i === trail.length - 2 && animating) {
+          const isComet = i === trail.length - 2 && animating;
+          const a = layout.get(from), b = layout.get(to);
+          const isRailFwd = !!a && !!b && a.y === b.y && b.x > a.x;
+          if (isRailFwd && !isComet) continue; // static rail already draws it — don't clobber the tees
+          const laneHex = laneHexOf(to);
+          if (isComet) {
             const head = phase * cells.length;
             cells.forEach((c, ci) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(cometColor(head - ci, TAIL, flow.main.errored ? theme.err : laneHex, theme.pulseHot, theme.wireDim, 0.2 + 0.3 * tempo)), width, height));
           } else {
             const baseI = 0.2 + 0.3 * ((i + 1) / Math.max(1, trail.length - 1));
             cells.forEach((c) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(lerpHex(theme.wireDim, laneHex, baseI)), width, height));
           }
+        }
+
+        // dynamic drop arrow: the rail taps DOWN into the currently-active card
+        const activeK = flow.main.activeKind;
+        if (activeK && COARSE_STAGES.includes(activeK)) {
+          const r = layout.get(activeK)!;
+          const sx = r.x + (r.w >> 1);
+          const dropCol = RGBA.fromHex(flow.main.errored ? theme.err : (animating ? lerpHex(laneHexOf(activeK), theme.pulseHot, breathe(now)) : laneHexOf(activeK)));
+          put(buffer, sx, railY, "┯", dropCol, width, height);
+          for (let y = railY + 1; y < r.y - 1; y++) put(buffer, sx, y, "│", dropCol, width, height);
+          put(buffer, sx, r.y - 1, "▼", dropCol, width, height);
         }
 
         for (const k of presentKinds) {
@@ -193,17 +281,29 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         }
 
         // tool vertical expansion
-        if (childKinds.length > 0) {
-          for (const c of pipeBranch(toolRect, childRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-          childKinds.forEach((k, i) => {
-            const r = childRects[i]!;
+        if (toolN > 0) {
+          for (const c of pipeBranch(toolRect, toolChildRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          toolChildKinds.forEach((k, i) => {
+            const r = toolChildRects[i]!;
             const activeChild = k === flow.main.activeTool;
             const laneHex = laneHexOf("tool");
             const fg = RGBA.fromHex(activeChild ? (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : theme.fg) : theme.dim);
             drawStr(buffer, r.x, r.y, clip(`${iconFor(k as IconKey)} ${k} ×${flow.main.toolBreakdown[k] ?? 0}`, width - r.x - 2), fg, width, height);
           });
-          const extra = Object.keys(flow.main.toolBreakdown).length - childKinds.length;
-          if (extra > 0) drawStr(buffer, toolRect.x + 4, (childRects[childRects.length - 1]?.y ?? toolRect.y + toolRect.h) + 1, `+${extra} more`, RGBA.fromHex(theme.dim), width, height);
+          if (toolExtra > 0) drawStr(buffer, toolRect.x + 4, (toolChildRects[toolChildRects.length - 1]?.y ?? toolRect.y + toolRect.h) + 1, `+${toolExtra} more`, RGBA.fromHex(theme.dim), width, height);
+        }
+
+        // skill vertical expansion (#9)
+        if (showSkillCard && skillN > 0) {
+          for (const c of pipeBranch(skillRect, skillChildRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          skillChildKinds.forEach((k, i) => {
+            const r = skillChildRects[i]!;
+            const activeChild = k === flow.main.activeSkill;
+            const laneHex = laneHexOf("skill");
+            const fg = RGBA.fromHex(activeChild ? (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : theme.fg) : theme.dim);
+            drawStr(buffer, r.x, r.y, clip(`${iconFor("skill")} ${k} ×${flow.main.skillBreakdown[k] ?? 0}`, width - r.x - 2), fg, width, height);
+          });
+          if (skillExtra > 0) drawStr(buffer, skillRect.x + 4, (skillChildRects[skillChildRects.length - 1]?.y ?? skillRect.y + skillRect.h) + 1, `+${skillExtra} more`, RGBA.fromHex(theme.dim), width, height);
         }
 
         const ak = flow.main.activeKind;
@@ -212,14 +312,19 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           drawBurst(buffer, r.x + (r.w >> 1), r.y, flow.main.milestone, phase, laneHexOf(ak), width, height);
         }
 
-        const bottoms = [...layout.values()].map((r) => r.y + r.h);
-        const childBottom = childRects.length > 0 ? childRects[childRects.length - 1]!.y + 2 : 0;
-        let sy = Math.max(channelY + 1, childBottom, ...bottoms) + 1;
+        const bottoms = [...layout.entries()].filter(([k]) => presentKinds.includes(k)).map(([, r]) => r.y + r.h);
+        const toolChildBottom = toolChildRects.length > 0 ? toolChildRects[toolChildRects.length - 1]!.y + 2 : 0;
+        const skillChildBottom = skillChildRects.length > 0 ? skillChildRects[skillChildRects.length - 1]!.y + 2 : 0;
+        let sy = Math.max(channelY + 1, toolChildBottom, skillChildBottom, ...bottoms) + 1;
         if (flow.agentsLive > 0) {
           drawStr(buffer, LEFT, sy, `▸ ${flow.agentsLive} agent${flow.agentsLive > 1 ? "s" : ""} live`, RGBA.fromHex(theme.accent), width, height);
           sy += 1;
           flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
         }
+        let by = hudTop;
+        if (showEconomy) { by -= 1; drawEconomy(buffer, LEFT, by, tokens, width, height); }
+        if (showHeartbeat) { by -= 1; drawHeartbeat(buffer, LEFT, by, width - LEFT - 2, presented, cursor, height); }
+        if (showTimeline) { by -= 3; drawSkillTimeline(buffer, LEFT, by, width - LEFT - 2, presented, cursor, height); }
         drawHud(buffer, flow, status, tempo, total, cursor, width, height);
       }}
     />
