@@ -37,13 +37,15 @@ test("headerValues without reveal shows the session totals", () => {
   expect(v.ctxTokens).toBe(700000);
   expect(v.pct).toBe(0.7);
 });
-test("headerValues with reveal animates cost+ctx against the STABLE final limit", () => {
-  const s = sess({ model: "claude-opus-4-8", costUSD: 986, tokens: { ...newSession("x", "x.jsonl").tokens, contextTokens: 940000, contextPct: 0.94 } });
-  const v = headerValues(s, { cost: 100, ctxTokens: 150000 });
-  expect(v.limit).toBe(1_000_000);     // stable: derived from final 940k, not the reveal ctx
+test("headerValues with reveal animates cost+ctx against the STABLE peak-derived limit", () => {
+  // a 1M run that /compact shrank: final ctx is 150k, but the run PEAKED at 940k.
+  // the limit must come from the peak (→1M) so a mid-run reveal never exceeds 100%.
+  const s = sess({ model: "claude-opus-4-8", costUSD: 986, tokens: { ...newSession("x", "x.jsonl").tokens, contextTokens: 150000, maxContextTokens: 940000, contextPct: 0.15 } });
+  const v = headerValues(s, { cost: 100, ctxTokens: 540000 });
+  expect(v.limit).toBe(1_000_000);     // derived from the PEAK (940k), not the final 150k
   expect(v.cost).toBe(100);            // animated
-  expect(v.ctxTokens).toBe(150000);    // animated
-  expect(v.pct).toBeCloseTo(0.15, 5);  // 150k / 1M, NOT 150k / 200k
+  expect(v.ctxTokens).toBe(540000);    // animated
+  expect(v.pct).toBeCloseTo(0.54, 5);  // 540k / 1M — old code read 540k / 200k = 270%
 });
 
 test("at the head the header shows session totals even when a trailing usage entry produced no beat", () => {

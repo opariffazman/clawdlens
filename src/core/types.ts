@@ -100,12 +100,13 @@ export interface SessionTokens {
   cacheRead: number;
   cacheCreate: number;
   contextTokens: number;         // latest-turn context size estimate
+  maxContextTokens: number;      // peak context size seen — infers the true window (a 1M run that /compact shrank still reads as 1M)
   contextPct: number;            // contextTokens / model limit (0..1+)
   webCalls: number;
 }
 
 export function newSessionTokens(): SessionTokens {
-  return { input: 0, output: 0, cacheRead: 0, cacheCreate: 0, contextTokens: 0, contextPct: 0, webCalls: 0 };
+  return { input: 0, output: 0, cacheRead: 0, cacheCreate: 0, contextTokens: 0, maxContextTokens: 0, contextPct: 0, webCalls: 0 };
 }
 
 export interface LensState {
@@ -149,6 +150,7 @@ export interface SessionState {
   lastEntryType: string;
   lastStopReason: string | null;
   lastBlockKind: string | null;  // 'thinking' | 'text' | 'tool_use'
+  lastSkill: string | null;      // last surfaced skill (Skill tool_use OR attribution) — dedups the skill stage
   pendingTools: Record<string, string>; // tool_use id -> beat id awaiting result
   lastErrored: boolean;
   openLanes: string[];           // open subagent lane ids

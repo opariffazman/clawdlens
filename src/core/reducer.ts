@@ -121,6 +121,7 @@ export function newSession(id: string, file: string): SessionState {
     lastEntryType: "",
     lastStopReason: null,
     lastBlockKind: null,
+    lastSkill: null,
     pendingTools: {},
     lastErrored: false,
     openLanes: [],
@@ -184,12 +185,27 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
     );
     s.tokens = { ...s.tokens, input: t.input, output: t.output, cacheRead: t.cacheRead, cacheCreate: t.cacheCreate };
     const ctx = contextTokens(usage);
-    if (ctx > 0) { s.tokens.contextTokens = ctx; s.tokens.contextPct = ctx / effectiveContextLimit(s.model, ctx); }
+    if (ctx > 0) {
+      s.tokens.contextTokens = ctx;
+      // Infer the window from the PEAK ctx, not the current one: a 1M run that
+      // /compact shrank below 200k must still gauge against 1M (else the reveal
+      // divides a mid-run 540k peak by 200k and reads >100%).
+      s.tokens.maxContextTokens = Math.max(s.tokens.maxContextTokens, ctx);
+      s.tokens.contextPct = ctx / effectiveContextLimit(s.model, s.tokens.maxContextTokens);
+    }
     s.tokens.webCalls += (usage.server_tool_use?.web_search_requests ?? 0) + (usage.server_tool_use?.web_fetch_requests ?? 0);
     s.costUSD = estimateCostUSD(t, s.model);
   }
 
   const lane = laneFor(e, s);
+  // Surface skills activated WITHOUT a Skill tool_use (e.g. slash-invoked like
+  // `/bootcamp-session`): emit a skill beat when attribution switches to a new
+  // skill on the main lane. The Skill tool_use path below also sets s.lastSkill,
+  // so a tool-invoked skill (e.g. bootcamp-quiz) isn't double-counted here.
+  if (lane === "main" && e.attributionSkill && e.attributionSkill !== s.lastSkill) {
+    pushBeat(s, { ts, kind: "skill", iconKey: "skill", label: e.attributionSkill, lane, skill: e.attributionSkill });
+    s.lastSkill = e.attributionSkill;
+  }
   const blocks = Array.isArray(m.content) ? m.content : [];
   for (const b of blocks as ContentBlock[]) {
     if (b.type === "thinking") {
@@ -204,6 +220,7 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
       if (name === "Skill") {
         const skill = String(b.input?.skill ?? "skill");
         pushBeat(s, { ts, kind: "skill", iconKey: "skill", label: skill, lane, toolUseId: b.id, skill });
+        s.lastSkill = skill; // dedup the attribution path that follows this invocation
       } else if (name === "Task") {
         const sub = String(b.input?.subagent_type ?? b.input?.description ?? "subagent");
         pushBeat(s, { ts, kind: "tool", iconKey: "task", label: `Task · ${sub}`, lane, toolUseId: b.id, skill: e.attributionSkill });
