@@ -16,6 +16,8 @@ export interface LaneFlow {
   err: number;                           // completed-tool failures (live)
   toolBreakdown: Record<string, number>; // live tool counts keyed by iconKey
   activeTool: string | null;             // head tool's iconKey (for the expand highlight)
+  skillBreakdown: Record<string, number>; // live skill counts keyed by skill name
+  activeSkill: string | null;             // head skill beat's name (for the expand highlight)
 }
 
 export interface FlowState {
@@ -57,11 +59,14 @@ function laneFlow(lane: string, label: string, beats: Beat[], isOpen: boolean, t
   const toolBreakdown: Record<string, number> = {};
   for (const b of beats) if (b.kind === "tool") toolBreakdown[b.iconKey] = (toolBreakdown[b.iconKey] ?? 0) + 1;
   const activeTool = head?.kind === "tool" ? head.iconKey : null;
+  const skillBreakdown: Record<string, number> = {};
+  for (const b of beats) if (b.kind === "skill") { const n = b.skill ?? b.label; skillBreakdown[n] = (skillBreakdown[n] ?? 0) + 1; }
+  const activeSkill = head?.kind === "skill" ? (head.skill ?? head.label) : null;
   return {
     lane, label, activeKind, trail,
     actionIcon: activeKind === "result" ? "result" : (head?.iconKey ?? null),
     detail: head?.detail ?? head?.label ?? null,
-    errored, milestone: head?.milestone ?? null, isOpen, counts, ok, err, toolBreakdown, activeTool,
+    errored, milestone: head?.milestone ?? null, isOpen, counts, ok, err, toolBreakdown, activeTool, skillBreakdown, activeSkill,
   };
 }
 

@@ -127,3 +127,28 @@ test("activeTool is the head tool's iconKey, else null", () => {
   expect(deriveFlow([beat({ kind: "tool", iconKey: "bash", ok: true })], 1, 5).main.activeTool).toBe("bash");
   expect(deriveFlow([beat({ kind: "thinking" })], 1, 5).main.activeTool).toBeNull();
 });
+
+test("skillBreakdown counts skill beats by name, cursor-synced", () => {
+  const beats = [
+    beat({ kind: "skill", skill: "tdd", label: "tdd" }),
+    beat({ kind: "skill", skill: "brainstorming", label: "brainstorming" }),
+    beat({ kind: "skill", skill: "tdd", label: "tdd" }),
+    beat({ kind: "thinking" }),
+  ];
+  expect(deriveFlow(beats, 2, 5).main.skillBreakdown).toEqual({ tdd: 1, brainstorming: 1 });
+  const f = deriveFlow(beats, 4, 5).main;
+  expect(f.skillBreakdown).toEqual({ tdd: 2, brainstorming: 1 });
+  expect(f.counts["skill"]).toBe(3);
+});
+
+test("skillBreakdown falls back to label when the skill name is absent", () => {
+  const f = deriveFlow([beat({ kind: "skill", label: "writing-plans" })], 1, 5).main;
+  expect(f.skillBreakdown).toEqual({ "writing-plans": 1 });
+});
+
+test("activeSkill is the head skill beat's name, else null", () => {
+  expect(deriveFlow([beat({ kind: "skill", skill: "tdd", label: "tdd" })], 1, 5).main.activeSkill).toBe("tdd");
+  expect(deriveFlow([beat({ kind: "skill", skill: "tdd", label: "tdd", ok: true })], 1, 5).main.activeSkill).toBe("tdd"); // completed skill
+  expect(deriveFlow([beat({ kind: "tool", iconKey: "bash" })], 1, 5).main.activeSkill).toBeNull();
+  expect(deriveFlow([beat({ kind: "thinking" })], 1, 5).main.activeSkill).toBeNull();
+});
