@@ -1,5 +1,4 @@
 import type { PipeKind } from "./pipeline";
-import { slotOf } from "./pipeline";
 
 export interface Cell { x: number; y: number; ch: string }
 export interface Rect { x: number; y: number; w: number; h: number }
