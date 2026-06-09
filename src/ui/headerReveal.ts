@@ -8,8 +8,11 @@ import { effectiveContextLimit } from "../core/tokens";
 export function cursorSnapshot(beats: Beat[], cursor: number): BeatSnap | null {
   if (beats.length === 0) return null;                 // no timeline -> caller shows session totals
   if (cursor <= 0) return { cost: 0, ctxTokens: 0 };   // start of reveal
-  const b = beats[Math.min(cursor, beats.length) - 1];
-  return b?.snap ?? null;                               // snapshot-less beat -> caller shows totals
+  if (cursor >= beats.length) return null;             // at/after the head -> show the authoritative
+                                                       // session totals (a trailing usage entry can
+                                                       // advance cost/ctx without producing a beat, so
+                                                       // the last beat's snap can lag the real total)
+  return beats[cursor - 1]?.snap ?? null;              // below the head: snapshot at the cursor (null if snapshot-less)
 }
 
 // Resolve the header's displayed cost / ctx tokens / ctx pct / limit. The context
