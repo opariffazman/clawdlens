@@ -166,7 +166,15 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const HEARTBEAT_ROWS = 1;
   const hasTimeline = lensState.skillGroups.length > 0 || presented.slice(0, cursor).some((b) => b.iconKey === "task");
   const TIMELINE_ROWS = hasTimeline ? 3 : 0;
-  const bottomBandRows = ECONOMY_ROWS + HEARTBEAT_ROWS + TIMELINE_ROWS;
+  // drop bottom bands (economy -> heartbeat -> timeline) until the pipeline + HUD fit.
+  const MIN_PIPELINE = RAIL_ROWS + CARD_H + 2; // rail + cards + return channel
+  const avail = hudTop - (TOP + RIBBON_ROWS) - sublaneRows;
+  let econ = ECONOMY_ROWS, heart = HEARTBEAT_ROWS, time = TIMELINE_ROWS;
+  while (avail - (econ + heart + time) < MIN_PIPELINE) {
+    if (econ) econ = 0; else if (heart) heart = 0; else if (time) time = 0; else break;
+  }
+  const showEconomy = econ > 0, showHeartbeat = heart > 0, showTimeline = time > 0 && TIMELINE_ROWS > 0;
+  const bottomBandRows = econ + heart + time;
   const regionTop = TOP + RIBBON_ROWS;
   const regionBottom = hudTop - sublaneRows - bottomBandRows;
   const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
@@ -299,9 +307,10 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           sy += 1;
           flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
         }
-        if (TIMELINE_ROWS > 0) drawSkillTimeline(buffer, LEFT, hudTop - ECONOMY_ROWS - HEARTBEAT_ROWS - TIMELINE_ROWS, width - LEFT - 2, presented, cursor, height);
-        drawHeartbeat(buffer, LEFT, hudTop - ECONOMY_ROWS - HEARTBEAT_ROWS, width - LEFT - 2, presented, cursor, height);
-        drawEconomy(buffer, LEFT, hudTop - ECONOMY_ROWS, tokens, width, height);
+        let by = hudTop;
+        if (showEconomy) { by -= 1; drawEconomy(buffer, LEFT, by, tokens, width, height); }
+        if (showHeartbeat) { by -= 1; drawHeartbeat(buffer, LEFT, by, width - LEFT - 2, presented, cursor, height); }
+        if (showTimeline) { by -= 3; drawSkillTimeline(buffer, LEFT, by, width - LEFT - 2, presented, cursor, height); }
         drawHud(buffer, flow, status, tempo, total, cursor, width, height);
       }}
     />
