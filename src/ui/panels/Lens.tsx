@@ -1,6 +1,6 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
 import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
-import { coarseCardRect, pipeForward, pipeReturn, pipeBranch, expandStack, type Rect, type Cell, LEFT, TOP, CARD_H } from "../../core/pipeline-geometry";
+import { coarseLayout, pipeForward, pipeReturn, pipeBranch, pipeElbow, expandStack, type Rect, type Cell, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
 import { rankOf } from "../../core/pipeline";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
@@ -23,9 +23,10 @@ interface Props {
 const TRAIL_HOPS = 3;
 const TAIL = 6;
 const MAX_CHILDREN = 6;
+const SKILL_SIDE_MIN = 16; // min (skill.x - tool.x) to render skill side-by-side; else stack under tool
 const COARSE_STAGES = ["think", "tool", "result", "chat"];
 const STAGE_ICON: Record<string, IconKey> = { think: "thinking", tool: "tool", skill: "skill", result: "result", chat: "text" };
-const STAGE_COL: Record<string, number> = { think: 0, tool: 1, skill: 1, result: 2, chat: 3 };
+const STAGE_COL: Record<string, number> = { think: 0, tool: 1, skill: 4, result: 2, chat: 3 };
 
 function laneHexOf(kind: string) {
   const col = STAGE_COL[kind] ?? (kind.charCodeAt(0) % theme.laneColors.length);
@@ -117,9 +118,11 @@ function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number,
 function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: number): Cell[] {
   const a = layout.get(from); const b = layout.get(to);
   if (!a || !b) return [];
+  if (to === "skill") return pipeElbow(a, b);
+  if (from === "skill") return pipeElbow(b, a).reverse();
   if (a.y === b.y && b.x > a.x) return pipeForward(a, b);
   if (a.y === b.y && b.x < a.x) return pipeReturn(a, b, channelY);
-  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse(); // reverse so the comet rides a→b (upward)
+  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse();
 }
 
 export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, width, height }: Props) {
@@ -127,21 +130,56 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const idle = status === "idle" || status === "dormant" || status === "waiting";
   const animating = animate && !idle;
 
-  const presentKinds = [...COARSE_STAGES];
-  const showSkill = !infoOn && (flow.main.counts["skill"] ?? 0) > 0;
-  if (showSkill) presentKinds.push("skill");
-  const layout = new Map<string, Rect>(presentKinds.map((k) => [k, coarseCardRect(k as Parameters<typeof coarseCardRect>[0])]));
-  const channelY = TOP + CARD_H + 1; // one row of clearance so the U-return has connecting legs
+  const hasSkill = (flow.main.counts["skill"] ?? 0) > 0;
 
-  const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
-  if (showSkill) backbone.push(["tool", "skill"]);
-
-  // tool vertical expansion (i): per-action child cards stacked under the tool card
-  const toolRect = layout.get("tool")!;
-  const childKinds = infoOn
+  // expand child kinds (i): tool by rank, skill by count desc then name
+  const toolChildKinds = infoOn
     ? Object.keys(flow.main.toolBreakdown).sort((a, b) => rankOf(a) - rankOf(b)).slice(0, MAX_CHILDREN)
     : [];
-  const childRects = expandStack(toolRect, childKinds.length);
+  const skillChildKinds = infoOn && hasSkill
+    ? Object.keys(flow.main.skillBreakdown).sort((a, b) => (flow.main.skillBreakdown[b]! - flow.main.skillBreakdown[a]!) || (a < b ? -1 : 1)).slice(0, MAX_CHILDREN)
+    : [];
+  const toolExtra = infoOn ? Object.keys(flow.main.toolBreakdown).length - toolChildKinds.length : 0;
+  const skillExtra = infoOn ? Object.keys(flow.main.skillBreakdown).length - skillChildKinds.length : 0;
+
+  // wide (side-by-side skill) vs narrow (skill under tool) — from the spread's gap
+  const probe: Map<string, Rect> = coarseLayout(width, TOP);
+  const wide = (probe.get("skill")!.x - probe.get("tool")!.x) >= SKILL_SIDE_MIN;
+
+  // vertical centering: estimate the block height, center between TOP and the HUD band
+  const bandH = 4;
+  const hudTop = height - bandH;
+  const sublaneRows = flow.agentsLive > 0 ? Math.min(3, flow.agentsLive) + 1 : 0;
+  const toolN = toolChildKinds.length;
+  const skillN = skillChildKinds.length;
+  let maxBottomRel = CARD_H + toolN + (toolExtra > 0 ? 1 : 0);
+  if (hasSkill) {
+    const skillTopRel = wide ? (CARD_H + ROW_GAP) : (CARD_H + toolN + (toolExtra > 0 ? 1 : 0) + ROW_GAP);
+    maxBottomRel = Math.max(maxBottomRel, skillTopRel + CARD_H + skillN + (skillExtra > 0 ? 1 : 0));
+  }
+  const blockH = maxBottomRel + 2;
+  const top = Math.max(TOP, TOP + Math.floor((hudTop - TOP - sublaneRows - blockH) / 2));
+
+  const layout: Map<string, Rect> = coarseLayout(width, top);
+  const channelY = top + CARD_H + 1;
+
+  const toolRect = layout.get("tool")!;
+  const toolChildRects = expandStack(toolRect, toolN);
+  const toolBlockBottom = toolN > 0 ? toolChildRects[toolChildRects.length - 1]!.y + 1 + (toolExtra > 0 ? 1 : 0) : toolRect.y + CARD_H;
+
+  // place skill: wide → gap column (from coarseLayout); narrow → below the tool block
+  let skillRect = layout.get("skill")!;
+  if (hasSkill && !wide) {
+    skillRect = { x: toolRect.x, y: toolBlockBottom + ROW_GAP, w: toolRect.w, h: CARD_H };
+    layout.set("skill", skillRect);
+  }
+  const skillChildRects = hasSkill ? expandStack(skillRect, skillN) : [];
+
+  const presentKinds = [...COARSE_STAGES];
+  if (hasSkill) presentKinds.push("skill");
+
+  const backbone: [string, string][] = [["think", "tool"], ["tool", "result"], ["result", "chat"]];
+  if (hasSkill) backbone.push(["tool", "skill"]);
 
   return (
     <box
@@ -154,9 +192,8 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
 
-        // during the tool expansion, back-edge (loop) pipes are hidden — the child
-        // stack occupies that space; the U-return reappears when collapsed.
-        const expanded = childKinds.length > 0;
+        // while tool is expanded, hide back-edge (loop) pipes — the stack uses that space
+        const expanded = toolN > 0;
         const isReturn = (from: string, to: string) => {
           const a = layout.get(from); const b = layout.get(to);
           return !!a && !!b && a.y === b.y && b.x < a.x;
@@ -193,17 +230,29 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         }
 
         // tool vertical expansion
-        if (childKinds.length > 0) {
-          for (const c of pipeBranch(toolRect, childRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-          childKinds.forEach((k, i) => {
-            const r = childRects[i]!;
+        if (toolN > 0) {
+          for (const c of pipeBranch(toolRect, toolChildRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          toolChildKinds.forEach((k, i) => {
+            const r = toolChildRects[i]!;
             const activeChild = k === flow.main.activeTool;
             const laneHex = laneHexOf("tool");
             const fg = RGBA.fromHex(activeChild ? (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : theme.fg) : theme.dim);
             drawStr(buffer, r.x, r.y, clip(`${iconFor(k as IconKey)} ${k} ×${flow.main.toolBreakdown[k] ?? 0}`, width - r.x - 2), fg, width, height);
           });
-          const extra = Object.keys(flow.main.toolBreakdown).length - childKinds.length;
-          if (extra > 0) drawStr(buffer, toolRect.x + 4, (childRects[childRects.length - 1]?.y ?? toolRect.y + toolRect.h) + 1, `+${extra} more`, RGBA.fromHex(theme.dim), width, height);
+          if (toolExtra > 0) drawStr(buffer, toolRect.x + 4, (toolChildRects[toolChildRects.length - 1]?.y ?? toolRect.y + toolRect.h) + 1, `+${toolExtra} more`, RGBA.fromHex(theme.dim), width, height);
+        }
+
+        // skill vertical expansion (#9)
+        if (hasSkill && skillN > 0) {
+          for (const c of pipeBranch(skillRect, skillChildRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          skillChildKinds.forEach((k, i) => {
+            const r = skillChildRects[i]!;
+            const activeChild = k === flow.main.activeSkill;
+            const laneHex = laneHexOf("skill");
+            const fg = RGBA.fromHex(activeChild ? (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : theme.fg) : theme.dim);
+            drawStr(buffer, r.x, r.y, clip(`${iconFor("skill")} ${k} ×${flow.main.skillBreakdown[k] ?? 0}`, width - r.x - 2), fg, width, height);
+          });
+          if (skillExtra > 0) drawStr(buffer, skillRect.x + 4, (skillChildRects[skillChildRects.length - 1]?.y ?? skillRect.y + skillRect.h) + 1, `+${skillExtra} more`, RGBA.fromHex(theme.dim), width, height);
         }
 
         const ak = flow.main.activeKind;
@@ -212,9 +261,10 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           drawBurst(buffer, r.x + (r.w >> 1), r.y, flow.main.milestone, phase, laneHexOf(ak), width, height);
         }
 
-        const bottoms = [...layout.values()].map((r) => r.y + r.h);
-        const childBottom = childRects.length > 0 ? childRects[childRects.length - 1]!.y + 2 : 0;
-        let sy = Math.max(channelY + 1, childBottom, ...bottoms) + 1;
+        const bottoms = [...layout.entries()].filter(([k]) => presentKinds.includes(k)).map(([, r]) => r.y + r.h);
+        const toolChildBottom = toolChildRects.length > 0 ? toolChildRects[toolChildRects.length - 1]!.y + 2 : 0;
+        const skillChildBottom = skillChildRects.length > 0 ? skillChildRects[skillChildRects.length - 1]!.y + 2 : 0;
+        let sy = Math.max(channelY + 1, toolChildBottom, skillChildBottom, ...bottoms) + 1;
         if (flow.agentsLive > 0) {
           drawStr(buffer, LEFT, sy, `▸ ${flow.agentsLive} agent${flow.agentsLive > 1 ? "s" : ""} live`, RGBA.fromHex(theme.accent), width, height);
           sy += 1;
