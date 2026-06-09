@@ -17,6 +17,33 @@ export function coarseCardRect(kind: PipeKind): Rect {
   return { x: LEFT + col * (CARD_W + ARROW_GAP), y: TOP + row * (CARD_H + ROW_GAP), w: CARD_W, h: CARD_H };
 }
 
+export const MAX_CARD_W = 18;
+
+// Width-aware coarse layout: think · tool · result · chat justified across the
+// full width (cardW capped, slack flows into the gaps), with the skill card one
+// row below, centered in the tool→result gap. `top` is supplied by the caller
+// (the panel centers the block vertically).
+export function coarseLayout(width: number, top: number): Map<PipeKind, Rect> {
+  const usable = Math.max(4 * CARD_W + 3 * ARROW_GAP, width - LEFT - 2);
+  const cardW = Math.max(CARD_W, Math.min(MAX_CARD_W, Math.floor(usable * 0.16)));
+  const gap = Math.max(ARROW_GAP, Math.floor((usable - 4 * cardW) / 3));
+  const colX = (c: number) => LEFT + c * (cardW + gap);
+  const m = new Map<PipeKind, Rect>();
+  m.set("think", { x: colX(0), y: top, w: cardW, h: CARD_H });
+  m.set("tool", { x: colX(1), y: top, w: cardW, h: CARD_H });
+  m.set("result", { x: colX(2), y: top, w: cardW, h: CARD_H });
+  m.set("chat", { x: colX(3), y: top, w: cardW, h: CARD_H });
+  const toolR = m.get("tool")!;
+  const resultR = m.get("result")!;
+  const gapInner = resultR.x - (toolR.x + toolR.w);
+  // skill sits centered in the tool→result gap; clamp so it never overlaps the
+  // tool card. When the gap is too narrow it lands at tool's right edge (and may
+  // touch result) — the panel then repositions it below tool (narrow fallback).
+  const sx = toolR.x + toolR.w + Math.max(0, Math.floor((gapInner - cardW) / 2));
+  m.set("skill", { x: Math.max(toolR.x + toolR.w, Math.min(sx, resultR.x - cardW)), y: top + CARD_H + ROW_GAP, w: cardW, h: CARD_H });
+  return m;
+}
+
 // forward pipe: a (left) → b (right), same row. Horizontal on the mid-row,
 // terminating in ▶ at b's left input port.
 export function pipeForward(a: Rect, b: Rect): Cell[] {

@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
-import { coarseCardRect, pipeForward, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { coarseCardRect, coarseLayout, pipeForward, pipeReturn, pipeBranch, expandStack, LEFT, TOP } from "../src/core/pipeline-geometry";
+import type { PipeKind } from "../src/core/pipeline";
 
 test("coarseCardRect places cards on fixed slots", () => {
   const think = coarseCardRect("think");
@@ -63,4 +64,38 @@ test("expandStack stacks n single-row child rects below the parent", () => {
   expect(rects.every((r) => r.y >= parent.y + parent.h)).toBe(true);
   expect(rects[0]!.y).toBeLessThan(rects[1]!.y);
   expect(rects[1]!.y).toBeLessThan(rects[2]!.y);
+});
+
+test("coarseLayout spreads four cards across the width in flow order, non-overlapping", () => {
+  const m = coarseLayout(160, TOP);
+  const order = ["think", "tool", "result", "chat"].map((k) => m.get(k as PipeKind)!);
+  for (let i = 1; i < order.length; i++) {
+    expect(order[i]!.x).toBeGreaterThan(order[i - 1]!.x + order[i - 1]!.w);
+    expect(order[i]!.y).toBe(TOP);
+  }
+  const last = order[3]!;
+  expect(last.x + last.w).toBeLessThanOrEqual(160);
+  expect(last.x + last.w).toBeGreaterThanOrEqual(160 - 4); // fills close to the full width
+});
+
+test("coarseLayout caps card width and pushes slack into the gaps", () => {
+  const narrow = coarseLayout(80, TOP);
+  const wide = coarseLayout(200, TOP);
+  const gap = (m: Map<any, any>) => m.get("tool")!.x - (m.get("think")!.x + m.get("think")!.w);
+  expect(wide.get("think")!.w).toBeLessThanOrEqual(18); // cardW capped
+  expect(gap(wide)).toBeGreaterThan(gap(narrow)); // wider terminal => fatter gaps
+});
+
+test("coarseLayout places the skill card one row below, between tool and result", () => {
+  const m = coarseLayout(200, TOP);
+  const skill = m.get("skill")!, tool = m.get("tool")!, result = m.get("result")!;
+  expect(skill.y).toBeGreaterThan(tool.y + tool.h);
+  expect(skill.x).toBeGreaterThanOrEqual(tool.x + tool.w);
+  expect(skill.x + skill.w).toBeLessThanOrEqual(result.x);
+});
+
+test("coarseLayout keeps the skill card from overlapping tool at narrow widths", () => {
+  const m = coarseLayout(80, TOP);
+  const skill = m.get("skill")!, tool = m.get("tool")!;
+  expect(skill.x).toBeGreaterThanOrEqual(tool.x + tool.w);
 });
