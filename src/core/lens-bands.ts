@@ -41,6 +41,9 @@ export function lensTimeline(beats: Beat[], cursor: number): LensTimeline {
     endTs: groups[i + 1]?.ts ?? range.cursorTs,
   }));
 
+  // A Task beat (iconKey "task", toolUseId = subagent lane id) opens an agent span;
+  // it ends at the last beat seen on that lane (the subagent's last activity in the
+  // revealed window) — a robust proxy for "agent done" that doesn't need the close ts.
   const agentByLane = new Map<string, { label: string; startTs: number; endTs: number }>();
   for (const b of beats) {
     if (b.iconKey === "task" && b.toolUseId) {
