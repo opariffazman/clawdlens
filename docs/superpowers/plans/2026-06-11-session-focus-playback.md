@@ -323,6 +323,12 @@ git commit -m "feat(player)!: unified 2-mode playback machine (playing/paused, d
 
 ### Task 2: Focus resolver (pure core, TDD)
 
+> Post-review amendment (commit 9e743d2): matching uses a NEW
+> `SessionState.projectDir` field (transcript parent dir name, derived in
+> `newSession`) — `project` stays the display basename. Containment guards the
+> root cwd (`"/"`), and newest-selection tie-breaks by id. The code below
+> predates that amendment; the repo is the source of truth.
+
 **Files:**
 - Create: `src/core/focus.ts`
 - Create: `tests/focus.test.ts`

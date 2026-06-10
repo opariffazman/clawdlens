@@ -104,7 +104,10 @@ resolveFocus({ sessions, invocationCwd, selectedId, userPinned }): {
 
 Matching rule (ordered):
 
-1. **Exact**: `session.project === projectKeyForCwd(invocationCwd)`.
+1. **Exact**: `session.projectDir === projectKeyForCwd(invocationCwd)`. Note:
+   `SessionState.project` is the DISPLAY basename (Header/picker); matching uses
+   the new `projectDir` field = the transcript's parent dir name (ground truth,
+   derived in `newSession` from the file path).
 2. **Containment fallback** (only when exact yields nothing):
    `session.cwd` starts with `invocationCwd + "/"` — covers monorepo roots
    whose sessions live in subdirectory project dirs. The exact-first order
