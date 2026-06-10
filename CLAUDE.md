@@ -42,6 +42,7 @@ src/ui/
   App.tsx          layout, keyboard, selection (by id), shared progress, replay state
   Showcase.tsx     full-width: Header + TabBar + active panel (+ CommandBox overlay on `:`). PanelId = lens|files|tasks|git|log; default = lens
   panels/Lens.tsx  default: n8n-style canvas — trigger half-pill + stage boxes (block-art icons, names below), skills/agents as dashed sub-nodes, persistent green trail wires, orbiting coral ring on the active node; `i` flips sub-row to tool breakdown
+  panels/lens/     Lens helpers: iconArt.ts (13 hand-crafted 7×3 block-art glyphs, single-width only), draw.ts, phaseRibbon/economy/heartbeat/skillTimeline bands
   panels/Flow.tsx  Log panel: buffered metro graph + energy pulse (setCell + RGBA, live)
   panels/Files.tsx file heatmap (full-session fileHeat)
   panels/Tasks.tsx agnostic: TodoWrite + reconstructed TaskCreate/TaskUpdate + superpowers phase fallback
