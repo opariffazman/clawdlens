@@ -258,3 +258,53 @@ export function wireLoop(a: Rect, b: Rect, channelY: number): Cell[] {
   cells.push({ x: b.x - 1, y: midB, ch: "▶" });
   return cells;
 }
+
+// ─── Sub-row layout (skills/agents under tool) ────────────────────────────────
+
+export interface SubRowLayout {
+  cells: Cell[];      // dashed trunk + rounded fan + dashed drops
+  circles: Rect[];    // SUB_W × SUB_H sub-node boxes
+  labelY: number;     // row for the names under the circles
+  shown: number;
+}
+
+// Skills/agents hang under tool like n8n AI sub-nodes: ◇ port (caller draws it),
+// dashed trunk, rounded tree fan, dashed drops into 3-row circles, names below.
+export function subRow(tool: Rect, n: number, width: number): SubRowLayout {
+  const dx = tool.x + (tool.w >> 1);
+  const dy = tool.y + tool.h - 1;
+  const fit = Math.max(0, Math.floor((width - LEFT - 2 - SUB_W) / SUB_PITCH) + 1);
+  const shown = Math.min(n, fit);
+  const cells: Cell[] = [];
+  const circles: Rect[] = [];
+  if (shown === 0) return { cells, circles, labelY: dy, shown };
+  const span = (shown - 1) * SUB_PITCH;
+  let cx0 = dx - (span >> 1);
+  cx0 = Math.max(LEFT + (SUB_W >> 1), Math.min(cx0, width - 2 - (SUB_W >> 1) - span));
+  const xs = Array.from({ length: shown }, (_, i) => cx0 + i * SUB_PITCH);
+  const fanY = dy + 2;
+  cells.push({ x: dx, y: dy + 1, ch: "┆" });
+  const lo = Math.min(xs[0]!, dx), hi = Math.max(xs[xs.length - 1]!, dx);
+  if (lo === hi) {
+    cells.push({ x: dx, y: fanY, ch: "┆" });
+  } else {
+    for (let x = lo; x <= hi; x++) {
+      let ch = "┄";
+      if (x === dx) ch = x === lo ? "╰" : x === hi ? "╯" : "┴";
+      else if (x === lo) ch = "╭";
+      else if (x === hi) ch = "╮";
+      else if (xs.includes(x)) ch = "┬";
+      cells.push({ x, y: fanY, ch });
+    }
+  }
+  for (const cx of xs) {
+    cells.push({ x: cx, y: fanY + 1, ch: "┆" });
+    circles.push({ x: cx - (SUB_W >> 1), y: fanY + 2, w: SUB_W, h: SUB_H });
+  }
+  return { cells, circles, labelY: fanY + 2 + SUB_H, shown };
+}
+
+// ◇ on the sub-node's top border (n8n diamond-to-diamond dashed wires)
+export function subPortCell(c: Rect): { x: number; y: number } {
+  return { x: c.x + (c.w >> 1), y: c.y };
+}

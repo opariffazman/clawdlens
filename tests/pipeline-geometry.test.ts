@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, railCells, railSegment, LEFT, TOP } from "../src/core/pipeline-geometry";
-import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell, wireForward, wireLoop } from "../src/core/pipeline-geometry";
+import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell, wireForward, wireLoop, subRow, subPortCell, SUB_W, SUB_H, SUB_PITCH, SUB_ROWS } from "../src/core/pipeline-geometry";
 import type { PipeKind } from "../src/core/pipeline";
 
 test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at the target port", () => {
@@ -229,4 +229,44 @@ test("wireLoop routes a rounded U below the row into the target's input port", (
   expect(cells.find((c) => c.ch === "╰")).toEqual({ x: 0, y: 12, ch: "╰" });
   expect(cells.find((c) => c.ch === "╭")).toEqual({ x: 0, y: 4, ch: "╭" });
   expect(cells[cells.length - 1]).toEqual({ x: 1, y: 4, ch: "▶" });
+});
+
+test("subRow lays circles at SUB_PITCH centered under the tool diamond", () => {
+  const tool = { x: 60, y: 2, w: 13, h: 7 };       // diamond at x=66, y=8
+  const sr = subRow(tool, 2, 150);
+  expect(sr.shown).toBe(2);
+  expect(sr.circles.length).toBe(2);
+  const c0 = sr.circles[0]!, c1 = sr.circles[1]!;
+  expect(c1.x - c0.x).toBe(SUB_PITCH);
+  expect(c0.w).toBe(SUB_W);
+  expect(c0.h).toBe(SUB_H);
+  // rows: ┆ at dy+1, fan at dy+2, ┆ at dy+3, circle top at dy+4, label at dy+7
+  expect(c0.y).toBe(8 + 4);
+  expect(sr.labelY).toBe(8 + SUB_ROWS);
+  // fan glyphs: rounded ends, ┴ junction under the trunk
+  const fan = sr.cells.filter((c) => c.y === 10);
+  expect(fan.find((c) => c.ch === "╭")).toBeTruthy();
+  expect(fan.find((c) => c.ch === "╮")).toBeTruthy();
+  expect(fan.find((c) => c.x === 66)!.ch).toBe("┴");
+});
+
+test("subRow with one aligned child is a straight dashed drop", () => {
+  const tool = { x: 60, y: 2, w: 13, h: 7 };
+  const sr = subRow(tool, 1, 150);
+  expect(sr.shown).toBe(1);
+  expect(sr.cells.every((c) => c.ch === "┆")).toBe(true);
+});
+
+test("subRow caps shown by width and clamps circles inside the panel", () => {
+  const tool = { x: 10, y: 2, w: 13, h: 7 };
+  const sr = subRow(tool, 8, 60);
+  expect(sr.shown).toBeLessThan(8);
+  for (const c of sr.circles) {
+    expect(c.x).toBeGreaterThanOrEqual(LEFT);
+    expect(c.x + c.w).toBeLessThanOrEqual(58);
+  }
+});
+
+test("subPortCell is the circle's top-center", () => {
+  expect(subPortCell({ x: 10, y: 5, w: 5, h: 3 })).toEqual({ x: 12, y: 5 });
 });
