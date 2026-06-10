@@ -11,6 +11,7 @@ bun run dump         # headless debug: print live sessions
 bun test             # full suite (bun:test)
 bunx tsc --noEmit    # typecheck (strict + noUncheckedIndexedAccess)
 CL_ICONS=unicode bun run dev   # plain-glyph fallback (no Nerd Font)
+bun run gen:art      # regenerate lens icon/label art (devDeps: resvg, figlet)
 ```
 
 ## Stack
@@ -41,8 +42,8 @@ src/store/
 src/ui/
   App.tsx          layout, keyboard, selection (by id), shared progress, replay state
   Showcase.tsx     full-width: Header + TabBar + active panel (+ CommandBox overlay on `:`). PanelId = lens|files|tasks|git|log; default = lens
-  panels/Lens.tsx  default: n8n-style canvas — trigger half-pill + stage boxes (block-art icons, names below), skills/agents as dashed sub-nodes, persistent green trail wires, orbiting coral ring on the active node; `i` flips sub-row to tool breakdown
-  panels/lens/     Lens helpers: iconArt.ts (13 hand-crafted 7×3 block-art glyphs, single-width only), draw.ts, phaseRibbon/economy/heartbeat/skillTimeline bands
+  panels/Lens.tsx  default: n8n-style canvas — trigger half-pill + stage boxes (braille lucide icons, names below), skills/agents as dashed sub-nodes, persistent green trail wires, orbiting coral ring on the active node; `i` flips sub-row to tool breakdown; CLAWDLENS splash when empty; think-box breathe during long thinks
+  panels/lens/     Lens helpers: iconArt.gen.ts (braille lucide icons + miniwi labels — bun run gen:art, never hand-edit), draw.ts, phaseRibbon/economy/heartbeat/skillTimeline bands
   panels/Flow.tsx  Log panel: buffered metro graph + energy pulse (setCell + RGBA, live)
   panels/Files.tsx file heatmap (full-session fileHeat)
   panels/Tasks.tsx agnostic: TodoWrite + reconstructed TaskCreate/TaskUpdate + superpowers phase fallback
