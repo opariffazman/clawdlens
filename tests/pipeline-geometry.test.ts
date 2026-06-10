@@ -270,3 +270,10 @@ test("subRow caps shown by width and clamps circles inside the panel", () => {
 test("subPortCell is the circle's top-center", () => {
   expect(subPortCell({ x: 10, y: 5, w: 5, h: 3 })).toEqual({ x: 12, y: 5 });
 });
+
+test("subRow with zero items (or no width) is empty", () => {
+  const tool = { x: 60, y: 2, w: 13, h: 7 };
+  expect(subRow(tool, 0, 150).shown).toBe(0);
+  expect(subRow(tool, 0, 150).cells).toEqual([]);
+  expect(subRow(tool, 3, 5).shown).toBe(0);
+});

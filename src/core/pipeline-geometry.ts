@@ -264,7 +264,7 @@ export function wireLoop(a: Rect, b: Rect, channelY: number): Cell[] {
 export interface SubRowLayout {
   cells: Cell[];      // dashed trunk + rounded fan + dashed drops
   circles: Rect[];    // SUB_W × SUB_H sub-node boxes
-  labelY: number;     // row for the names under the circles
+  labelY: number;     // row for the names under the circles (= tool bottom row when shown===0 — skip drawing)
   shown: number;
 }
 
@@ -280,7 +280,7 @@ export function subRow(tool: Rect, n: number, width: number): SubRowLayout {
   if (shown === 0) return { cells, circles, labelY: dy, shown };
   const span = (shown - 1) * SUB_PITCH;
   let cx0 = dx - (span >> 1);
-  cx0 = Math.max(LEFT + (SUB_W >> 1), Math.min(cx0, width - 2 - (SUB_W >> 1) - span));
+  cx0 = Math.max(LEFT + (SUB_W >> 1), Math.min(cx0, width - 2 - ((SUB_W + 1) >> 1) - span));
   const xs = Array.from({ length: shown }, (_, i) => cx0 + i * SUB_PITCH);
   const fanY = dy + 2;
   cells.push({ x: dx, y: dy + 1, ch: "┆" });
