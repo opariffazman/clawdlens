@@ -89,9 +89,12 @@ function drawRing(buf: OptimizedBuffer, r: Rect, rounded: boolean, now: number, 
   const cells = borderCells(r, rounded);
   const head = Math.floor(((now % periodMs) / periodMs) * cells.length);
   const arc = Math.max(4, cells.length >> 2);
+  const base = lerpHex(theme.dim, theme.coral, 0.2);
+  const hot = lerpHex(theme.coral, theme.pulseHot, 0.6);
   cells.forEach((c, i) => {
     const d = (i - head + cells.length) % cells.length;
-    const hex = d < arc ? lerpHex(theme.coral, theme.pulseHot, Math.max(0, 1 - d / 2) * 0.6) : lerpHex(theme.dim, theme.coral, 0.2);
+    // conic fade: hot at the head, easing to base over the whole arc (n8n-style)
+    const hex = d < arc ? lerpHex(base, hot, 1 - d / arc) : base;
     put(buf, c.x, c.y, c.ch, RGBA.fromHex(hex), w, h);
   });
 }

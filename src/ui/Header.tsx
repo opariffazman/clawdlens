@@ -26,18 +26,21 @@ export function Header({ session, panel, marker, reveal }: { session: SessionSta
   return (
     <box style={{ flexShrink: 0, flexDirection: "row", justifyContent: "space-between", backgroundColor: TRANSPARENT }}>
       <box style={{ flexDirection: "column", backgroundColor: TRANSPARENT }}>
+        {/* wrapMode none: squeezed header text must clip, not wrap — a wrapped row
+            grows the header past 3 rows and breaks Showcase's fixed height budget
+            (panel body then overflows the bottom border at narrow widths). */}
         <box style={{ flexDirection: "row", gap: 1 }}>
           <text fg={g.color}>{g.glyph}</text>
-          <text fg={theme.fg}>{`${session.project} · ${session.gitBranch || "?"} · ${session.model} · ${session.status}`}</text>
+          <text fg={theme.fg} wrapMode="none">{`${session.project} · ${session.gitBranch || "?"} · ${session.model} · ${session.status}`}</text>
         </box>
         <box style={{ flexDirection: "row", gap: 1 }}>
           <text fg={theme.dim}>ctx</text>
-          <text fg={pctColor}>{gaugeBar(pct, 10)}</text>
+          <text fg={pctColor} wrapMode="none">{gaugeBar(pct, 10)}</text>
           <text fg={pctColor}>{Math.round(pct * 100) + "%"}</text>
-          <text fg={theme.dim}>{fmtTokens(ctxTokens, limit)}</text>
+          <text fg={theme.dim} wrapMode="none">{fmtTokens(ctxTokens, limit)}</text>
           <text fg={theme.ok}>{fmtCost(cost)}</text>
           <text fg={theme.dim}>{elapsed}</text>
-          <text fg={theme.accent}>{marker}</text>
+          <text fg={theme.accent} wrapMode="none">{marker}</text>
           {session.parseErrors > 0 && <text fg={theme.err}>{`⚠ ${session.parseErrors}`}</text>}
         </box>
       </box>

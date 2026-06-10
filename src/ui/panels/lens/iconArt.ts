@@ -21,5 +21,5 @@ export const ICON_ART: Record<ArtKey, [string, string, string]> = {
   task:     ["  ▟█▙  ", " ▞ █ ▚ ", "▐▌▐█▌▐▌"],  // fan-out / sitemap
   skill:    ["  ▗▙▖  ", "▄▟███▙▄", " ▝▛▀▜▘ "],  // star
   todo:     ["▣ ▬▬▬▬ ", "▣ ▬▬▬▬ ", "▢ ▬▬▬▬ "],  // checklist
-  result:   ["     ▗▟", "▜▖  ▟▛ ", " ▜▄▟▘  "],  // check mark
+  result:   ["     ▗▟", "▜▖  ▟▛ ", " ▜▙▟▛  "],  // check mark
 };
