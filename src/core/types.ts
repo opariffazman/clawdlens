@@ -131,6 +131,7 @@ export interface SessionState {
   title: string;
   cwd: string;
   project: string;
+  projectDir: string;            // encoded transcript dir name (~/.claude/projects/<this>/) — focus matching, not display
   gitBranch: string;
   model: string;
   status: Status;

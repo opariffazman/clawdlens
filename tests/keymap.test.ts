@@ -22,8 +22,12 @@ test("panels + misc", () => {
   expect(a("q")).toEqual({ type: "quit" });
 });
 
+test("l maps to go-live", () => {
+  expect(mapKey({ name: "l" })).toEqual({ type: "live" });
+});
+
 test("dropped keys are unmapped", () => {
-  for (const k of ["j", "k", "h", "l", "g", "G", "p", "w", "L", "R", "1", "5", "[", "]", "+", "-", "z", "home", "end"]) {
+  for (const k of ["j", "k", "h", "g", "G", "p", "w", "L", "R", "1", "5", "[", "]", "+", "-", "z", "home", "end"]) {
     expect(a(k)).toBeNull();
   }
 });

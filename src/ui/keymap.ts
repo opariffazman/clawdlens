@@ -2,7 +2,7 @@ export type Action =
   | { type: "panel-next" } | { type: "panel-prev" }
   | { type: "beat-back" } | { type: "beat-fwd" }
   | { type: "speed-up" } | { type: "speed-down" }
-  | { type: "pause" } | { type: "replay" }
+  | { type: "pause" } | { type: "replay" } | { type: "live" }
   | { type: "info" } | { type: "help" } | { type: "quit" };
 
 export interface KeyEvent { name: string; shift?: boolean; ctrl?: boolean }
@@ -16,6 +16,7 @@ export function mapKey(key: KeyEvent): Action | null {
   if (n === "right") return { type: "speed-up" };
   if (n === "space") return { type: "pause" };
   if (n === "r") return { type: "replay" };
+  if (n === "l") return { type: "live" };
   if (n === "i") return { type: "info" };
   if (n === "?") return { type: "help" };
   if (n === "q") return { type: "quit" };

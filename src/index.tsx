@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
 import { App } from "./ui/App";
@@ -9,4 +10,7 @@ const renderer = await createCliRenderer({
   exitOnCtrlC: true,
   onDestroy: () => { store.stop(); process.exit(0); },
 });
-createRoot(renderer).render(<App store={store} />);
+// resolve symlinks so the cwd matches what Claude recorded in the transcript
+let cwd = process.cwd();
+try { cwd = realpathSync(cwd); } catch {}
+createRoot(renderer).render(<App store={store} cwd={cwd} />);

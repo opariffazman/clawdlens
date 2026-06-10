@@ -34,13 +34,14 @@ src/core/   (pure, TDD)
   pipeline-geometry.ts  n8n node-row layout: width ladder, border/port/badge cells, straight+rounded wires, sub-row tree fan
   git-log.ts       parseGitLog(stdout)→Commit[]; GIT_LOG_ARGS (--all --no-patch, %H%P%D%s)
   git-graph.ts     layoutGitGraph(commits)→FlowGraph (git log --graph lane algo: 1st parent continues, extra parents branch, converging lanes rejoin)
-  player.ts        paced coalescing player: cursor, modes live/paused/history, replay+loop, ONE adaptive interval
+  player.ts        paced coalescing player: ONE cursor, modes playing/paused ("live" derived = playing+caught-up), total toggle/replay()/toLive(), loop, ONE adaptive interval
+  focus.ts         cwd-scoped session focus: projectKeyForCwd (non-alnum→dash), projectSessionsFor (exact projectDir match, else cwd containment), resolveFocus (pin > project-follow > global-initial)
   loadTranscript.ts  loadSession(file)/loadBeats(file): whole-file fold (replay + aggregate panels)
 src/store/
-  sessionStore.ts  wire discover/tail/parse/reduce/status/lens; subscribe; pollOnce(now); fullSession(id)/fullBeats(id)
+  sessionStore.ts  wire discover/tail/parse/reduce/status/lens; subscribe; pollOnce(now); fullSession(id)
   gitFetch.ts      gitLog(cwd): Bun.spawnSync git + parseGitLog
 src/ui/
-  App.tsx          layout, keyboard, selection (by id), shared progress, replay state
+  App.tsx          layout, keyboard, cwd-locked session focus (resolveFocus effect + seek policy: active→toLive, idle→replay), shared progress
   Showcase.tsx     full-width: Header + TabBar + active panel (+ CommandBox overlay on `:`). PanelId = lens|files|tasks|git|log; default = lens
   panels/Lens.tsx  default: n8n-style canvas — trigger half-pill + stage boxes (braille lucide icons, names below), skills/agents as dashed sub-nodes, persistent green trail wires, orbiting coral ring on the active node; `i` flips sub-row to tool breakdown; CLAWDLENS splash when empty; think-box breathe during long thinks
   panels/lens/     Lens helpers: iconArt.gen.ts (braille lucide icons + miniwi labels — bun run gen:art, never hand-edit), draw.ts, phaseRibbon/economy/heartbeat/skillTimeline bands
@@ -59,7 +60,8 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 ## Key concepts
 
 - **Beat** = one narrative event (thinking/text/tool/skill/result). `iconKey` semantic; glyph resolved in UI (icons.ts).
-- **Player cursor = ONE shared timeline.** `progress = activePlayer.cursor()/all().length` drives ALL panels (Flow/Files/Tasks/Git) — reveal in sync, finish together. Not per-panel timers.
+- **Player cursor = ONE shared timeline.** `progress = player.cursor()/all().length` drives ALL panels (Flow/Files/Tasks/Git) — reveal in sync, finish together. Not per-panel timers. ONE player per session — `r` rewinds it (no separate replay player).
+- **Session focus.** Launch inside a Claude project dir → `⌂` lock: follow that project's newest session (active → jump live, idle/error → auto-replay from 0). Elsewhere → newest session once, pinned. Manual pick via `:`→sessions = hard pin. Never auto-switches across projects. `SessionState.projectDir` (transcript parent dir) is the match key; `project` stays the display basename.
 - **Adaptive cadence** (live AND replay): `interval = max(min, base*factor)/speed`; factor eases as catches up; `←`/`→` scale whole interval via `/speed`.
 - **Backfill vs full-fold.** Live store tails from EOF + ~64KB backfill (recent only). Aggregate panels (Files/Tasks/git cwd) use `store.fullSession()` = whole transcript.
 - **Lens** = superpowers phases from skill attribution + spec/plan file writes.
@@ -67,7 +69,7 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 
 ## Keys
 
-`:` command palette (fuzzy; sessions via `:`→sessions, then `/` to filter) · `Tab`/`Shift-Tab` panels · `↑`/`↓` scrub · `←`/`→` speed · `space` pause · `r` replay · `i` lens detail · `?` help · `q` quit. Energy-pulse auto-runs while the timeline moves; `q` restores the terminal cleanly (no Ctrl+C).
+`:` command palette (fuzzy; sessions via `:`→sessions, then `/` to filter) · `Tab`/`Shift-Tab` panels · `↑`/`↓` scrub (auto-pauses) · `←`/`→` speed · `space` play/pause from cursor (paced catch-up, never bursts) · `r` replay from 0 · `l` jump to live · `i` lens detail · `?` help · `q` quit. Energy-pulse auto-runs while the timeline moves; `q` restores the terminal cleanly (no Ctrl+C).
 
 ## Conventions
 

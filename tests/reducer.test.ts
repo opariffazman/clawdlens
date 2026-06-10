@@ -212,3 +212,8 @@ test("a Bash git branch-create beat carries milestone='branch'", () => {
   const beat = s.beats.find((b) => b.label === "Bash")!;
   expect(beat.milestone).toBe("branch");
 });
+
+test("newSession derives projectDir from the transcript path", () => {
+  const s = newSession("abc", "/home/u/.claude/projects/-home-u-repo-x/abc.jsonl");
+  expect(s.projectDir).toBe("-home-u-repo-x");
+});

@@ -1,20 +1,18 @@
 import type { Beat } from "./types";
 
-export interface PlayerOpts { baseIntervalMs?: number; minIntervalMs?: number; replay?: boolean; loop?: boolean }
-export type PlayMode = "live" | "paused" | "history";
+export interface PlayerOpts { baseIntervalMs?: number; minIntervalMs?: number; loop?: boolean }
+export type PlayMode = "playing" | "paused";
 
 export function createPlayer(opts: PlayerOpts = {}) {
   const base = opts.baseIntervalMs ?? 1000;
   const min = opts.minIntervalMs ?? 120;
-  const replay = opts.replay ?? false;
   let loop = opts.loop ?? false;
 
   let coalesced: Beat[] = [];
-  let head = 0;             // number of coalesced beats presented (live head)
-  let cursor = 0;          // presentation cursor (== head in live mode)
-  let mode: PlayMode = "live";
+  let cursor = 0;                // the ONE position — view and playback head
+  let mode: PlayMode = "playing"; // "live" is derived: playing && cursor caught up to the tail
   let speed = 1;
-  let lastAdvanceAt = -1;
+  let lastAdvanceAt = -1;        // -1 → next tick re-bases (prevents time-debt bursts)
   let started = false;
 
   function rebuild(beats: Beat[]) {
@@ -28,11 +26,10 @@ export function createPlayer(opts: PlayerOpts = {}) {
       }
     }
     coalesced = out;
-    if (head > coalesced.length) head = coalesced.length;
-    if (mode === "live") cursor = head;
+    if (cursor > coalesced.length) { cursor = coalesced.length; lastAdvanceAt = -1; }
   }
 
-  function backlog(): number { return coalesced.length - head; }
+  function backlog(): number { return coalesced.length - cursor; }
 
   function interval(): number {
     // adaptive (eases toward base as it catches up / nears the end), but gentle
@@ -42,41 +39,42 @@ export function createPlayer(opts: PlayerOpts = {}) {
     return Math.max(min, base * factor) / speed;
   }
 
+  function pause() { mode = "paused"; }
+  function play() { mode = "playing"; lastAdvanceAt = -1; }
+
   return {
     setBeats(beats: Beat[]) { rebuild(beats); started = true; },
     tick(now: number) {
-      if (!started) return;
-      if (mode !== "live") return; // pause/scrub freezes both live and replay
+      if (!started || mode !== "playing") return;
       if (lastAdvanceAt < 0) lastAdvanceAt = now;
-      while (head < coalesced.length && now - lastAdvanceAt >= interval()) {
-        head += 1;
-        lastAdvanceAt += interval();
+      while (cursor < coalesced.length) {
+        const iv = interval();
+        if (now - lastAdvanceAt < iv) break;
+        cursor += 1;
+        lastAdvanceAt += iv;
       }
-      if (replay && loop && head >= coalesced.length && coalesced.length > 0) {
-        head = 0; // screensaver wrap
+      if (loop && cursor >= coalesced.length && coalesced.length > 0) {
+        cursor = 0; // screensaver wrap
         lastAdvanceAt = now;
       }
-      cursor = head;
     },
     presented(): Beat[] { return coalesced.slice(0, cursor); },
     all(): Beat[] { return coalesced; },
     backlog,
     mode(): PlayMode { return mode; },
     cursor(): number { return cursor; },
-    headIndex(): number { return head; },
     setSpeed(mult: number) { speed = Math.max(0.25, Math.min(8, mult)); },
     setLoop(on: boolean) { loop = on; },
     isLoop(): boolean { return loop; },
     speed(): number { return speed; },
     intervalMs(): number { return interval(); },
     lastAdvanceMs(): number { return lastAdvanceAt; },
-    pause() { if (mode === "live") mode = "paused"; },
-    play() { if (mode === "paused") mode = "live"; },
-    stepBack() { mode = "history"; cursor = Math.max(0, cursor - 1); },
-    stepForward() { if (mode === "history") { cursor = Math.min(coalesced.length, cursor + 1); if (cursor >= head) toLiveInternal(); } },
-    toStart() { mode = "history"; cursor = 0; },
-    toLive() { toLiveInternal(); },
+    pause,
+    play,
+    toggle() { if (mode === "playing") pause(); else play(); },
+    stepBack() { pause(); cursor = Math.max(0, cursor - 1); },
+    stepForward() { pause(); cursor = Math.min(coalesced.length, cursor + 1); },
+    replay() { cursor = 0; play(); },
+    toLive() { cursor = coalesced.length; play(); },
   };
-
-  function toLiveInternal() { mode = "live"; cursor = head; }
 }

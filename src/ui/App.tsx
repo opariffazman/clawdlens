@@ -13,7 +13,7 @@ import { filterCommands, commandSuggestions } from "../core/commands";
 import { rankRows } from "../core/chrome";
 import { Showcase, PANELS, type PanelId } from "./Showcase";
 import { DEFAULT_PANEL } from "../core/types";
-import { createPlayer } from "../core/player";
+import { resolveFocus, projectSessionsFor } from "../core/focus";
 import { gitLog } from "../store/gitFetch";
 
 type Store = ReturnType<typeof createStore>;
@@ -22,14 +22,13 @@ type PickerState = { open: boolean; stage: "projects" | "sessions"; project: str
 // transparent canvas → inherit the user's terminal background (OLED-friendly)
 const CLOSED: PickerState = { open: false, stage: "projects", project: null, index: 0, query: "", filtering: false };
 
-export function App({ store }: { store: Store }) {
+export function App({ store, cwd }: { store: Store; cwd: string }) {
   const renderer = useRenderer();
   const [sessions, setSessions] = useState(store.sessions());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelId>(DEFAULT_PANEL);
   const [showHelp, setShowHelp] = useState(false);
   const [size, setSize] = useState({ w: renderer.terminalWidth ?? 120, h: renderer.terminalHeight ?? 40 });
-  const [replay, setReplay] = useState<{ player: ReturnType<typeof createPlayer> | null }>({ player: null });
   const [commits, setCommits] = useState<import("../core/types").Commit[]>([]);
   const [full, setFull] = useState<import("../core/types").SessionState | null>(null);
   const [picker, setPicker] = useState<PickerState>(CLOSED);
@@ -55,13 +54,14 @@ export function App({ store }: { store: Store }) {
     renderer.on("resize", onResize);
     return () => { renderer.off("resize", onResize); };
   }, [renderer]);
+  const selected = sessions.find((s) => s.id === selectedId) ?? null;
+  const [userPinned, setUserPinned] = useState(false);
+  // project-locked when the invocation cwd maps to session(s) — drives ⌂ and auto-follow
+  const projectLocked = useMemo(() => projectSessionsFor(sessions, cwd).length > 0, [sessions, cwd]);
   useEffect(() => {
-    if (!replay.player) return;
-    const id = setInterval(() => { replay.player!.tick(Date.now()); }, 100);
-    return () => clearInterval(id);
-  }, [replay.player]);
-
-  const selected = sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null;
+    const d = resolveFocus({ sessions, invocationCwd: cwd, selectedId, userPinned });
+    if (d.id !== selectedId && d.id !== null) setSelectedId(d.id);
+  }, [sessions, selectedId, userPinned, cwd]);
   // The live store keeps only a 64 KB backfill window per session, which large
   // metadata entries can fill entirely (0 beats) and which undercounts cumulative
   // cost. Fold the FULL transcript for the selected session — re-folding only on
@@ -72,6 +72,19 @@ export function App({ store }: { store: Store }) {
     [selected?.id, selected?.lastActivityTs, store],
   );
   const players = usePlayers(sessions, selected?.id ?? null, selectedFull?.beats ?? []);
+  // monitoring means NOW for active sessions; idle sessions tell their story from 0.
+  // Runs on selection change AND when the full fold first yields beats — toLive()
+  // on an empty fold would land on 0 and replay once beats arrive. Later folds of
+  // the same session don't re-run this (hasBeats stays true), so a scrub position
+  // survives live updates.
+  const hasBeats = (selectedFull?.beats.length ?? 0) > 0;
+  useEffect(() => {
+    if (!selected || !hasBeats) return;
+    const p = players.get(selected.id);
+    if (!p) return;
+    const active = selected.status === "running" || selected.status === "working" || selected.status === "waiting";
+    if (active) p.toLive(); else p.replay();
+  }, [selected?.id, hasBeats, players]);
   // Header cumulative fields (cost, elapsed) from the full fold; status/ctx stay live.
   const headerSession = mergeHeaderSession(selected, selectedFull);
 
@@ -88,17 +101,16 @@ export function App({ store }: { store: Store }) {
   }, [panel, selected?.id, gitScope]);
 
   const player = selected ? players.get(selected.id) : null;
-  const activePlayer = replay.player ?? player;
-  // one shared timeline: all panels reveal in sync with the active player's cursor
-  const playerTotal = activePlayer ? activePlayer.all().length : 0;
-  const cursor = activePlayer ? activePlayer.cursor() : 0;
+  // one shared timeline: all panels reveal in sync with the player's cursor
+  const playerTotal = player ? player.all().length : 0;
+  const cursor = player ? player.cursor() : 0;
   // Snapshot of cumulative cost/ctx at the cursor — drives the header's count-up
   // during reveal/replay/scrub. null (no beats) -> header shows session totals.
-  const reveal = activePlayer ? cursorSnapshot(activePlayer.all(), cursor) : null;
-  const progress = activePlayer && playerTotal > 0 ? cursor / playerTotal : 1;
-  const lastAdvanceMs = activePlayer ? activePlayer.lastAdvanceMs() : -1;
-  const intervalMs = activePlayer ? activePlayer.intervalMs() : 1000;
-  const animate = activePlayer ? shouldAnimate(activePlayer.mode(), lastAdvanceMs, intervalMs, Date.now()) : false;
+  const reveal = player ? cursorSnapshot(player.all(), cursor) : null;
+  const progress = player && playerTotal > 0 ? cursor / playerTotal : 1;
+  const lastAdvanceMs = player ? player.lastAdvanceMs() : -1;
+  const intervalMs = player ? player.intervalMs() : 1000;
+  const animate = player ? shouldAnimate(player.mode(), lastAdvanceMs, intervalMs, Date.now()) : false;
 
   // Force a full repaint whenever the scroll position or layout changes — the
   // moments stale ghost cells form. Pulse-only frames (cursor unchanged) keep
@@ -107,9 +119,9 @@ export function App({ store }: { store: Store }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, replay.player, picker.open, picker.stage, picker.query, picker.filtering, full, infoOn, showHelp, animate, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, picker.open, picker.stage, picker.query, picker.filtering, full, infoOn, showHelp, animate, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
-  const switchTo = (id: string | null) => { setReplay({ player: null }); setSelectedId(id); };
+  const switchTo = (id: string | null) => { if (id) setUserPinned(true); setSelectedId(id); };
 
   const runCommand = (id: string) => {
     switch (id) {
@@ -120,15 +132,9 @@ export function App({ store }: { store: Store }) {
       case "panel.log": setPanel("log"); break;
       case "nav.sessions": setPicker({ open: true, stage: "projects", project: null, index: 0, query: "", filtering: false }); break;
       case "view.help": setShowHelp(true); break;
-      case "play.pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
-      case "play.replay": {
-        if (replay.player) { setReplay({ player: null }); break; }
-        if (!selected) break;
-        const rp = createPlayer({ baseIntervalMs: 900, replay: true, loop: false });
-        rp.setBeats(store.fullBeats(selected.id));
-        setReplay({ player: rp });
-        break;
-      }
+      case "play.pause": player?.toggle(); break;
+      case "play.replay": player?.replay(); break;
+      case "play.live": player?.toLive(); break;
       case "files.sort": setFilesSort((s) => (s === "edits" ? "reads" : s === "reads" ? "recent" : "edits")); break;
       case "git.scope": setGitScope((s) => (s === "all" ? "branch" : "all")); break;
       case "tasks.hideDone": setTasksHideDone((v) => !v); break;
@@ -193,35 +199,28 @@ export function App({ store }: { store: Store }) {
       case "quit": renderer.destroy(); break;
       case "panel-next": setPanel((p) => PANELS[(PANELS.indexOf(p) + 1) % PANELS.length]!); break;
       case "panel-prev": setPanel((p) => PANELS[(PANELS.indexOf(p) + PANELS.length - 1) % PANELS.length]!); break;
-      case "beat-back": activePlayer?.stepBack(); break;
-      case "beat-fwd": activePlayer?.stepForward(); break; // stepForward snaps to live at head (player.ts:76)
-      case "pause": activePlayer && (activePlayer.mode() === "paused" ? activePlayer.play() : activePlayer.pause()); break;
-      case "speed-up": activePlayer?.setSpeed((activePlayer.speed() || 1) * 1.5); break;
-      case "speed-down": activePlayer?.setSpeed((activePlayer.speed() || 1) / 1.5); break;
+      case "beat-back": player?.stepBack(); break;
+      case "beat-fwd": player?.stepForward(); break;
+      case "pause": player?.toggle(); break;
+      case "speed-up": player?.setSpeed((player.speed() || 1) * 1.5); break;
+      case "speed-down": player?.setSpeed((player.speed() || 1) / 1.5); break;
       case "info": setInfoOn((v) => !v); break;
       case "help": setShowHelp((h) => !h); break;
-      case "replay": {
-        if (replay.player) { setReplay({ player: null }); break; }
-        if (!selected) break;
-        const rp = createPlayer({ baseIntervalMs: 900, replay: true, loop: false });
-        rp.setBeats(store.fullBeats(selected.id));
-        setReplay({ player: rp });
-        break;
-      }
+      case "replay": player?.replay(); break;
+      case "live": player?.toLive(); break;
     }
   });
 
   const { w, h } = size;
 
   const marker = (() => {
-    const sp = activePlayer ? activePlayer.speed() : 1;
-    const spd = ` ${Number(sp.toFixed(2))}×`;
-    let m: string;
-    if (replay.player) m = `⏮ replay ${replay.player.cursor()}/${replay.player.all().length}${replay.player.mode() === "paused" ? " ⏸" : ""}${replay.player.isLoop() ? " · ⟳" : ""}`;
-    else if (!player) return "";
-    else if (player.mode() === "history") m = `⏪ ${player.cursor()}/${player.all().length}`;
-    else if (player.mode() === "paused") m = "⏸ paused";
-    else { const back = player.backlog(); m = back > 0 ? `▸+${back}` : "▸ live"; }
+    if (!player) return "";
+    const spd = ` ${Number(player.speed().toFixed(2))}×`;
+    const m = player.mode() === "paused"
+      ? `⏸ ${player.cursor()}/${player.all().length}`
+      : player.backlog() > 0
+        ? `▸ ${player.cursor()}/${player.all().length}`
+        : "▸ live";
     return m + spd;
   })();
 
@@ -239,8 +238,9 @@ export function App({ store }: { store: Store }) {
         <Showcase
           session={headerSession}
           panel={panel}
-          presented={activePlayer ? activePlayer.presented() : []}
+          presented={player ? player.presented() : []}
           cursor={cursor}
+          focusLocked={projectLocked}
           playerTotal={playerTotal}
           infoOn={infoOn}
           lastAdvanceMs={lastAdvanceMs}
