@@ -36,9 +36,10 @@ interface Props {
   paletteQuery: string;
   paletteGhost: string;      // inline ghost completion
   reveal: BeatSnap | null;   // cursor snapshot for the header's count-up animation
+  focusLocked?: boolean;     // invocation cwd matched session(s) → ⌂ in the header
 }
 
-export function Showcase({ session, panel, presented, cursor, playerTotal, infoOn, lastAdvanceMs, intervalMs, animate, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost, reveal }: Props) {
+export function Showcase({ session, panel, presented, cursor, playerTotal, infoOn, lastAdvanceMs, intervalMs, animate, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost, reveal, focusLocked }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, borderStyle: "rounded", borderColor: theme.accent, backgroundColor: TRANSPARENT, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -53,7 +54,7 @@ export function Showcase({ session, panel, presented, cursor, playerTotal, infoO
   const bodyHeight = Math.max(1, height - 6 - (paletteOpen ? 3 : 0));
   return (
     <box style={{ flexGrow: 1, flexDirection: "column", backgroundColor: TRANSPARENT }}>
-      <Header session={session} panel={panel} marker={marker} reveal={reveal} />
+      <Header session={session} panel={panel} marker={marker} reveal={reveal} locked={focusLocked} />
       {/* command palette sits ABOVE the panel (y-axis), pushing tabs + frame down */}
       {paletteOpen && <CommandBox query={paletteQuery} ghost={paletteGhost} width={width} />}
       <TabBar panels={PANELS} active={panel} width={width} />

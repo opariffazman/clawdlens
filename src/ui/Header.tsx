@@ -16,7 +16,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out;
 }
 
-export function Header({ session, panel, marker, reveal }: { session: SessionState; panel: PanelId; marker: string; reveal?: BeatSnap | null }) {
+export function Header({ session, panel, marker, reveal, locked }: { session: SessionState; panel: PanelId; marker: string; reveal?: BeatSnap | null; locked?: boolean }) {
   const g = statusGlyph(session.status);
   const { cost, ctxTokens, pct, limit } = headerValues(session, reveal ?? null);
   const pctColor = pct > 0.85 ? theme.err : pct > 0.6 ? theme.warn : theme.ok;
@@ -31,7 +31,7 @@ export function Header({ session, panel, marker, reveal }: { session: SessionSta
             (panel body then overflows the bottom border at narrow widths). */}
         <box style={{ flexDirection: "row", gap: 1 }}>
           <text fg={g.color}>{g.glyph}</text>
-          <text fg={theme.fg} wrapMode="none">{`${session.project} · ${session.gitBranch || "?"} · ${session.model} · ${session.status}`}</text>
+          <text fg={theme.fg} wrapMode="none">{`${locked ? "⌂ " : ""}${session.project} · ${session.gitBranch || "?"} · ${session.model} · ${session.status}`}</text>
         </box>
         <box style={{ flexDirection: "row", gap: 1 }}>
           <text fg={theme.dim}>ctx</text>
