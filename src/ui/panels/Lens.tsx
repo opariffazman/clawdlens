@@ -91,7 +91,7 @@ function drawNodeBox(
     drawStr(buf, r.x + ((r.w - nm.length) >> 1), ny, nm, nameFg, w, h);
     ny += 1;
   }
-  const dt = clip(detail, r.w + 2);
+  const dt = clip(detail, r.w); // within the box width — an overhang punches holes in the chat backward wire
   if (dt) drawStr(buf, r.x + ((r.w - dt.length) >> 1), ny, dt, RGBA.fromHex(theme.dim), w, h);
 }
 
@@ -328,7 +328,13 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
             : `×${flow.main.counts[k] ?? 0}`;
           const art = mode === "art" ? (nl.wide ? ICON_ART_13 : ICON_ART_7)[STAGE_ART[k] ?? "tool"] : null;
           const bigLabel = bigNames ? LABEL_ART[k as keyof typeof LABEL_ART] ?? null : null;
-          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, detail, border, pulseHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
+          // miniwi names push the detail line onto the sub-row circles' middle row —
+          // suppress a detail that would punch through a circle (it stays in glyph tier)
+          const detY = r.y + r.h + (bigLabel ? LABEL_H : 1);
+          const dLen = Math.min([...detail].length, r.w);
+          const dx = r.x + ((r.w - dLen) >> 1);
+          const hitsCircle = sr !== null && sr.circles.some((c) => detY >= c.y && detY < c.y + c.h && dx <= c.x + c.w - 1 && dx + dLen - 1 >= c.x);
+          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, hitsCircle ? "" : detail, border, pulseHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
           // ports (chat's dangling output stays — n8n shows the bare port circle)
           if (k !== "prompt") put(buffer, portIn(r).x, portIn(r).y, "○", RGBA.fromHex(theme.dim), width, height);
           put(buffer, portOut(r).x, portOut(r).y, "●", RGBA.fromHex(theme.dim), width, height);

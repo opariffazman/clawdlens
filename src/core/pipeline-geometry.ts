@@ -12,7 +12,6 @@ export const BOX_W_WIDE = 17;        // wide tier: holds the 13x5 braille art
 export const BOX_W_NARROW = 9;
 export const BOX_H_ART = 7;
 export const BOX_H_GLYPH = 5;
-export const NAME_ROWS = 2;          // name + detail line below each box
 export const SUB_ROWS = 7;           // ┆ + fan + ┆ + 3-row circle + label
 export const SUB_W = 5;
 export const SUB_H = 3;
