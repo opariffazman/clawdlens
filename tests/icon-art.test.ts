@@ -17,5 +17,5 @@ test("every art is exactly ART_H rows of ART_W single-width glyphs", () => {
 
 test("covers all 12 IconKeys plus prompt", () => {
   const keys = Object.keys(ICON_ART).sort();
-  expect(keys).toEqual(["bash", "edit", "prompt", "read", "result", "search", "skill", "task", "text", "thinking", "todo", "tool"].sort());
+  expect(keys).toEqual(["bash", "edit", "prompt", "read", "result", "search", "skill", "task", "text", "thinking", "todo", "tool", "web"].sort());
 });

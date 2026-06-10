@@ -17,6 +17,7 @@ export const ICON_ART: Record<ArtKey, [string, string, string]> = {
   edit:     ["    ▗▄▖", "  ▗▟█▛ ", " ▟█▛▘  "],  // pencil, diagonal
   read:     ["▛▀▀▀▀▜ ", "▌▪▪▪ ▐ ", "▙▄▄▄▄▟ "],  // document with lines
   search:   [" ▄▀▀▄  ", " ▀▄▄▀  ", "    ▝▙ "],  // magnifier
+  web:      [" ▗▄█▄▖ ", "▐██▌██▌", " ▝▀█▀▘ "],  // globe with meridian
   task:     ["  ▟█▙  ", " ▞ █ ▚ ", "▐▌▐█▌▐▌"],  // fan-out / sitemap
   skill:    ["  ▗▙▖  ", "▄▟███▙▄", " ▝▛▀▜▘ "],  // star
   todo:     ["▣ ▬▬▬▬ ", "▣ ▬▬▬▬ ", "▢ ▬▬▬▬ "],  // checklist
