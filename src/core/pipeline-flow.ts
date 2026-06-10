@@ -64,8 +64,7 @@ function laneFlow(lane: string, label: string, beats: Beat[], isOpen: boolean, t
   const skillBreakdown: Record<string, number> = {};
   for (const b of beats) if (b.kind === "skill") { const n = b.skill ?? b.label; skillBreakdown[n] = (skillBreakdown[n] ?? 0) + 1; }
   const activeSkill = head?.kind === "skill" ? (head.skill ?? head.label) : null;
-  const seq: string[] = [];
-  for (const s of steps) if (seq.at(-1) !== s) seq.push(s);
+  const seq = lastDistinct(steps, steps.length);
   const hops: Record<string, number> = {};
   for (let i = 0; i + 1 < seq.length; i++) {
     const k = `${seq[i]}>${seq[i + 1]}`;

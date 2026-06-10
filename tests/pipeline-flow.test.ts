@@ -158,9 +158,7 @@ test("hops counts distinct-collapsed transitions; lastHop is the newest", () => 
     beat({ kind: "thinking" }), beat({ kind: "tool", ok: true }),   // think>tool, tool>result
     beat({ kind: "thinking" }), beat({ kind: "tool" }),             // result>think, think>tool
   ], 4, 3);
-  expect(f.main.hops["think>tool"]).toBe(2);
-  expect(f.main.hops["tool>result"]).toBe(1);
-  expect(f.main.hops["result>think"]).toBe(1);
+  expect(f.main.hops).toEqual({ "think>tool": 2, "tool>result": 1, "result>think": 1 });
   expect(f.main.lastHop).toBe("think>tool");
 });
 
