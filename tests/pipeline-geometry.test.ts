@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, railCells, railSegment, LEFT, TOP } from "../src/core/pipeline-geometry";
-import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell } from "../src/core/pipeline-geometry";
+import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell, wireForward, wireLoop } from "../src/core/pipeline-geometry";
 import type { PipeKind } from "../src/core/pipeline";
 
 test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at the target port", () => {
@@ -200,4 +200,33 @@ test("port/badge/diamond/bolt cells sit on the border at the spec positions", ()
   expect(badgeCell(r)).toEqual({ x: 21, y: 8 });
   expect(diamondCell(r)).toEqual({ x: 16, y: 8 });
   expect(boltCell(r)).toEqual({ x: 9, y: 5 });
+});
+
+test("wireForward runs ─ between boxes and lands ▶ before the input port", () => {
+  const a = { x: 2, y: 1, w: 13, h: 7 };
+  const b = { x: 24, y: 1, w: 13, h: 7 };
+  const cells = wireForward(a, b);
+  expect(cells[0]).toEqual({ x: 15, y: 4, ch: "─" });
+  expect(cells[cells.length - 1]).toEqual({ x: 23, y: 4, ch: "▶" });
+  expect(cells.every((c) => c.y === 4)).toBe(true);
+});
+
+test("wireForward embeds the ×N label mid-wire when it fits, omits it when not", () => {
+  const a = { x: 2, y: 1, w: 13, h: 7 };
+  const b = { x: 24, y: 1, w: 13, h: 7 };
+  const labelled = wireForward(a, b, "×42");
+  expect(labelled.map((c) => c.ch).join("")).toContain("×42");
+  const tight = wireForward(a, { x: 19, y: 1, w: 13, h: 7 }, "×42424242");
+  expect(tight.map((c) => c.ch).join("")).not.toContain("×4");
+});
+
+test("wireLoop routes a rounded U below the row into the target's input port", () => {
+  const a = { x: 50, y: 1, w: 13, h: 7 };   // chat
+  const b = { x: 2, y: 1, w: 13, h: 7 };    // think
+  const cells = wireLoop(a, b, 12);
+  expect(cells[0]).toEqual({ x: 63, y: 4, ch: "╮" });
+  expect(cells.find((c) => c.ch === "╯")).toEqual({ x: 63, y: 12, ch: "╯" });
+  expect(cells.find((c) => c.ch === "╰")).toEqual({ x: 0, y: 12, ch: "╰" });
+  expect(cells.find((c) => c.ch === "╭")).toEqual({ x: 0, y: 4, ch: "╭" });
+  expect(cells[cells.length - 1]).toEqual({ x: 1, y: 4, ch: "▶" });
 });

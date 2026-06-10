@@ -224,3 +224,37 @@ export function diamondCell(r: Rect): { x: number; y: number } {
 export function boltCell(r: Rect): { x: number; y: number } {
   return { x: r.x - 1, y: r.y + (r.h >> 1) };
 }
+
+// straight forward wire at mid-box height; optional ×N label embedded mid-run
+// (n8n item-count pill). Caller draws ● / ○ on the box borders themselves.
+export function wireForward(a: Rect, b: Rect, label?: string): Cell[] {
+  const y = a.y + (a.h >> 1);
+  const x0 = a.x + a.w, x1 = b.x - 2;
+  const cells: Cell[] = [];
+  for (let x = x0; x <= x1; x++) cells.push({ x, y, ch: "─" });
+  cells.push({ x: b.x - 1, y, ch: "▶" });
+  if (label && x1 - x0 + 1 >= label.length + 4) {
+    const lx = x0 + ((x1 - x0 + 1 - label.length) >> 1);
+    for (let i = 0; i < label.length; i++) cells[lx - x0 + i] = { x: lx + i, y, ch: label[i]! };
+  }
+  return cells;
+}
+
+// backward wire: exits just right of a's output port, rounded U below the row
+// (n8n smoothstep), rises just left of b and enters b's input port with ▶.
+export function wireLoop(a: Rect, b: Rect, channelY: number): Cell[] {
+  const cells: Cell[] = [];
+  const midA = a.y + (a.h >> 1);
+  const midB = b.y + (b.h >> 1);
+  const ax = a.x + a.w;
+  const bx = b.x - 2;
+  cells.push({ x: ax, y: midA, ch: "╮" });
+  for (let y = midA + 1; y < channelY; y++) cells.push({ x: ax, y, ch: "│" });
+  cells.push({ x: ax, y: channelY, ch: "╯" });
+  for (let x = ax - 1; x > bx; x--) cells.push({ x, y: channelY, ch: "─" });
+  cells.push({ x: bx, y: channelY, ch: "╰" });
+  for (let y = channelY - 1; y > midB; y--) cells.push({ x: bx, y, ch: "│" });
+  cells.push({ x: bx, y: midB, ch: "╭" });
+  cells.push({ x: b.x - 1, y: midB, ch: "▶" });
+  return cells;
+}
