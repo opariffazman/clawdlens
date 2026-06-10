@@ -72,17 +72,19 @@ export function App({ store, cwd }: { store: Store; cwd: string }) {
     [selected?.id, selected?.lastActivityTs, store],
   );
   const players = usePlayers(sessions, selected?.id ?? null, selectedFull?.beats ?? []);
-  // monitoring means NOW for active sessions; idle sessions tell their story from 0
-  const seekApplied = useRef<string | null>(null);
+  // monitoring means NOW for active sessions; idle sessions tell their story from 0.
+  // Runs on selection change AND when the full fold first yields beats — toLive()
+  // on an empty fold would land on 0 and replay once beats arrive. Later folds of
+  // the same session don't re-run this (hasBeats stays true), so a scrub position
+  // survives live updates.
+  const hasBeats = (selectedFull?.beats.length ?? 0) > 0;
   useEffect(() => {
-    if (!selected) return;
-    if (seekApplied.current === selected.id) return;
-    seekApplied.current = selected.id;
+    if (!selected || !hasBeats) return;
     const p = players.get(selected.id);
     if (!p) return;
     const active = selected.status === "running" || selected.status === "working" || selected.status === "waiting";
     if (active) p.toLive(); else p.replay();
-  }, [selected?.id, players]);
+  }, [selected?.id, hasBeats, players]);
   // Header cumulative fields (cost, elapsed) from the full fold; status/ctx stay live.
   const headerSession = mergeHeaderSession(selected, selectedFull);
 
