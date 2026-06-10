@@ -3,7 +3,7 @@ import { deriveFlow } from "../../core/pipeline-flow";
 import {
   nodeLayout, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell,
   wireForward, wireLoop, subRow, subPortCell,
-  NAME_ROWS, SUB_ROWS, BOX_H_ART, BOX_H_GLYPH, LEFT, TOP,
+  SUB_ROWS, BOX_H_ART, BOX_H_GLYPH, LEFT, TOP,
   type BoxMode, type NodeLayout, type Rect,
 } from "../../core/pipeline-geometry";
 import { rankOf } from "../../core/pipeline";
@@ -12,7 +12,7 @@ import { theme, TRANSPARENT } from "../theme";
 import { breathe, lerpHex, pulsePhase } from "../anim";
 import { iconFor } from "../icons";
 import { put, drawStr, clip, laneHexOf } from "./lens/draw";
-import { ICON_ART, ART_W, ART_H, type ArtKey } from "./lens/iconArt";
+import { ICON_ART_7, ICON_ART_13, LABEL_ART, LABEL_H, type ArtKey } from "./lens/iconArt";
 import { detectLensFromBeats } from "../../core/lens";
 import { drawPhaseRibbon } from "./lens/phaseRibbon";
 import { drawEconomy } from "./lens/economy";
@@ -62,26 +62,37 @@ function drawBurst(buf: OptimizedBuffer, cx: number, cy: number, kind: "commit" 
 
 // box: border + centered art/glyph + name/detail BELOW (n8n anatomy)
 function drawNodeBox(
-  buf: OptimizedBuffer, r: Rect, mode: BoxMode, key: string,
-  name: string, detail: string, border: RGBA, iconHex: string, nameFg: RGBA,
+  buf: OptimizedBuffer, r: Rect, art: string[] | null, glyph: string, key: string,
+  name: string, bigLabel: string[] | null, detail: string, border: RGBA, iconHex: string, nameFg: RGBA,
   w: number, h: number,
 ) {
   for (const c of borderCells(r, key === "prompt")) put(buf, c.x, c.y, c.ch, border, w, h);
   const icon = RGBA.fromHex(iconHex);
-  if (mode === "art") {
-    const rows = ICON_ART[STAGE_ART[key] ?? "tool"];
-    const ax = r.x + ((r.w - ART_W) >> 1);
-    const ay = r.y + ((r.h - ART_H) >> 1);
-    rows.forEach((row, i) => {
+  if (art) {
+    const aw = [...art[0]!].length;
+    const ax = r.x + ((r.w - aw) >> 1);
+    const ay = r.y + ((r.h - art.length) >> 1);
+    art.forEach((row, i) => {
       for (let j = 0; j < row.length; j++) if (row[j] !== " ") put(buf, ax + j, ay + i, row[j]!, icon, w, h);
     });
   } else {
-    put(buf, r.x + (r.w >> 1), r.y + (r.h >> 1), iconFor(STAGE_GLYPH[key] ?? "tool"), icon, w, h);
+    put(buf, r.x + (r.w >> 1), r.y + (r.h >> 1), glyph, icon, w, h);
   }
-  const nm = clip(name, r.w + 2);
-  drawStr(buf, r.x + ((r.w - nm.length) >> 1), r.y + r.h, nm, nameFg, w, h);
+  let ny = r.y + r.h;
+  if (bigLabel) {
+    const lw = [...bigLabel[0]!].length;
+    const lx = r.x + ((r.w - lw) >> 1);
+    bigLabel.forEach((row, i) => {
+      for (let j = 0; j < row.length; j++) if (row[j] !== " ") put(buf, lx + j, ny + i, row[j]!, nameFg, w, h);
+    });
+    ny += bigLabel.length;
+  } else {
+    const nm = clip(name, r.w + 2);
+    drawStr(buf, r.x + ((r.w - nm.length) >> 1), ny, nm, nameFg, w, h);
+    ny += 1;
+  }
   const dt = clip(detail, r.w + 2);
-  if (dt) drawStr(buf, r.x + ((r.w - dt.length) >> 1), r.y + r.h + 1, dt, RGBA.fromHex(theme.dim), w, h);
+  if (dt) drawStr(buf, r.x + ((r.w - dt.length) >> 1), ny, dt, RGBA.fromHex(theme.dim), w, h);
 }
 
 // orbiting coral ring: recolor the border cells with a chasing arc (n8n conic ring)
@@ -168,13 +179,15 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const hasTimeline = lensState.skillGroups.length > 0 || presented.slice(0, cursor).some((b) => b.iconKey === "task");
   let ribbon = ribbonOn ? 2 : 0, econ = 1, heart = 1, time = hasTimeline ? 3 : 0;
   let mode: BoxMode = "art";
+  let bigNames = true; // miniwi node names; falls back to 1-row plain under pressure
   let sub = items.length > 0 ? SUB_ROWS : 0;
-  // sub-row rows OVERLAP the name rows (trunk/fan pass behind the labels — wires
-  // run behind nodes in n8n too), so the block needs boxH + max(sub, NAME_ROWS).
-  const blockNeed = () => (mode === "art" ? BOX_H_ART : BOX_H_GLYPH) + Math.max(sub, NAME_ROWS) + 1; // +1 loop channel
+  // sub-row rows OVERLAP the name rows (wires pass behind labels, as in n8n)
+  const nameRows = () => (bigNames ? LABEL_H : 1) + 1; // + detail line
+  const blockNeed = () => (mode === "art" ? BOX_H_ART : BOX_H_GLYPH) + Math.max(sub, nameRows()) + 1; // +1 loop channel
   const usable = hudTop - TOP;
   while (usable - ribbon - econ - heart - time < blockNeed()) {
-    if (mode === "art") mode = "glyph";
+    if (bigNames) bigNames = false;
+    else if (mode === "art") mode = "glyph";
     else if (econ) econ = 0;
     else if (heart) heart = 0;
     else if (time) time = 0;
@@ -188,7 +201,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const regionTop = TOP + ribbon;
   const regionBottom = hudTop - (econ + heart + time);
   const boxH = mode === "art" ? BOX_H_ART : BOX_H_GLYPH;
-  const blockH = boxH + (showSub ? SUB_ROWS : NAME_ROWS);
+  const blockH = boxH + Math.max(showSub ? SUB_ROWS : 0, (bigNames ? LABEL_H : 1) + 1);
   const top = Math.max(regionTop, regionTop + ((regionBottom - regionTop - blockH) >> 1));
   const nl: NodeLayout = nodeLayout(width, top, mode);
   const row = nl.row;
@@ -215,7 +228,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   }
 
   const sr = showSub ? subRow(nl.boxes.get("tool")!, items.length, width) : null;
-  const nameBottom = top + boxH + NAME_ROWS;
+  const nameBottom = top + boxH + (bigNames ? LABEL_H : 1) + 1;
   const blockBottom = Math.max(nameBottom, sr ? sr.labelY + 1 : 0);
   const channelY = blockBottom;
   const loopOn = (backCount > 0 || hotBack !== null) && channelY < regionBottom;
@@ -274,13 +287,14 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const active = k === activeK;
           const laneHex = k === "prompt" ? theme.coral : laneHexOf(k);
           const border = RGBA.fromHex(active ? (flow.main.errored ? theme.err : laneHex) : theme.dim);
-          const name = k;
           const detail =
             k === "prompt" ? `turn ${(flow.main.counts["chat"] ?? 0) + 1}`
             : k === "result" ? `✓${flow.main.ok} ✗${flow.main.err}`
             : active && flow.main.detail ? flow.main.detail
             : `×${flow.main.counts[k] ?? 0}`;
-          drawNodeBox(buffer, r, mode, k, name, detail, border, laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
+          const art = mode === "art" ? (nl.wide ? ICON_ART_13 : ICON_ART_7)[STAGE_ART[k] ?? "tool"] : null;
+          const bigLabel = bigNames ? LABEL_ART[k as keyof typeof LABEL_ART] ?? null : null;
+          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, detail, border, laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
           // ports (chat's dangling output stays — n8n shows the bare port circle)
           if (k !== "prompt") put(buffer, portIn(r).x, portIn(r).y, "○", RGBA.fromHex(theme.dim), width, height);
           put(buffer, portOut(r).x, portOut(r).y, "●", RGBA.fromHex(theme.dim), width, height);

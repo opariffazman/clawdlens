@@ -5,8 +5,3 @@ export const ART_H7 = 3;
 export const ART_W13 = 13;
 export const ART_H13 = 5;
 
-// TEMP compat for Lens.tsx until the Task-4 rewire — remove in Task 4.
-import { ICON_ART_7 as _i7 } from "./iconArt.gen";
-export const ICON_ART = _i7;
-export const ART_W = 7;
-export const ART_H = 3;
