@@ -3,7 +3,7 @@ import { COMMANDS, filterCommands, commandSuggestions } from "../src/core/comman
 
 test("registry has stable ids and panel switches", () => {
   const ids = COMMANDS.map((c) => c.id);
-  for (const id of ["panel.lens", "panel.log", "nav.sessions", "app.quit"]) {
+  for (const id of ["panel.lens", "panel.log", "nav.sessions", "app.quit", "play.pause", "play.replay", "play.live"]) {
     expect(ids).toContain(id);
   }
 });
@@ -21,6 +21,7 @@ test("context commands appear only on their panel", () => {
 
 test("alias matches and fuzzy ranking orders results", () => {
   expect(filterCommands("replay", "log").map((c) => c.id)).toContain("play.replay");
+  expect(filterCommands("live", "log").map((c) => c.id)).toContain("play.live");
   const q = filterCommands("git", "log");
   expect(q[0]!.id).toBe("panel.git");          // exact/leading match ranks first
 });
