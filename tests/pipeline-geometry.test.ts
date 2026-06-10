@@ -1,12 +1,13 @@
 import { test, expect } from "bun:test";
-import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell, wireForward, wireLoop, subRow, subPortCell, SUB_W, SUB_H, SUB_PITCH, SUB_ROWS, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { nodeLayout, BOX_W, BOX_W_WIDE, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell, wireForward, wireLoop, subRow, subPortCell, SUB_W, SUB_H, SUB_PITCH, SUB_ROWS, LEFT, TOP } from "../src/core/pipeline-geometry";
 
 test("nodeLayout full width: trigger + labels, 5 boxes in row order, non-overlapping", () => {
   const nl = nodeLayout(150, TOP, "art");
   expect(nl.row).toEqual(["prompt", "think", "tool", "result", "chat"]);
   expect(nl.showTrigger).toBe(true);
   expect(nl.showLabels).toBe(true);
-  expect(nl.boxW).toBe(BOX_W);
+  expect(nl.boxW).toBe(BOX_W_WIDE);
+  expect(nl.wide).toBe(true);
   expect(nl.boxH).toBe(BOX_H_ART);
   const rects = nl.row.map((k) => nl.boxes.get(k)!);
   for (let i = 0; i + 1 < rects.length; i++) expect(rects[i + 1]!.x).toBeGreaterThan(rects[i]!.x + rects[i]!.w);
@@ -23,6 +24,15 @@ test("nodeLayout width ladder: labels drop, then trigger drops, then boxes narro
   expect(nodeLayout(105, TOP, "art").showLabels).toBe(true);   // exact label threshold
   expect(nodeLayout(71, TOP, "art").boxW).toBe(BOX_W);         // exact narrow threshold
   expect(nodeLayout(70, TOP, "art").boxW).toBe(BOX_W_NARROW);
+});
+
+test("nodeLayout wide tier: 17-col boxes at width>=125 in art mode only", () => {
+  expect(nodeLayout(125, TOP, "art").wide).toBe(true);
+  expect(nodeLayout(125, TOP, "art").boxW).toBe(BOX_W_WIDE);
+  expect(nodeLayout(124, TOP, "art").wide).toBe(false);
+  expect(nodeLayout(124, TOP, "art").boxW).toBe(BOX_W);
+  expect(nodeLayout(150, TOP, "glyph").wide).toBe(false);   // wide is art-only
+  expect(nodeLayout(150, TOP, "glyph").boxW).toBe(BOX_W);
 });
 
 test("nodeLayout glyph mode uses the short box height", () => {
