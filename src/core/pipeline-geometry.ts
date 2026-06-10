@@ -142,3 +142,49 @@ export function expandStack(parent: Rect, n: number): Rect[] {
   for (let i = 0; i < n; i++) rects.push({ x, y: y0 + i, w: CARD_W, h: 1 });
   return rects;
 }
+
+// ─── n8n-style node row ──────────────────────────────────────────────────────
+
+export type BoxMode = "art" | "glyph";
+export const BOX_W = 13;
+export const BOX_W_NARROW = 9;
+export const BOX_H_ART = 7;
+export const BOX_H_GLYPH = 5;
+export const NAME_ROWS = 2;          // name + detail line below each box
+export const SUB_ROWS = 7;           // ┆ + fan + ┆ + 3-row circle + label
+export const SUB_W = 5;
+export const SUB_H = 3;
+export const SUB_PITCH = 16;
+const GAP_LABEL = 9;                 // min gap that fits an embedded ×N label
+const GAP_MIN = 5;                   // min gap for ─▶ + ports
+const GAP_SQUEEZE = 3;
+const ROW_FULL = ["prompt", "think", "tool", "result", "chat"];
+
+export interface NodeLayout {
+  boxes: Map<string, Rect>;
+  row: string[];
+  mode: BoxMode;
+  boxW: number;
+  boxH: number;
+  showTrigger: boolean;
+  showLabels: boolean;
+}
+
+function rowNeed(n: number, bw: number, gap: number): number {
+  return LEFT + n * bw + (n - 1) * gap + 2;
+}
+
+// Width ladder: full (trigger+labels) → drop labels → drop trigger → narrow boxes.
+// Slack beyond the minimum flows into the gaps (justified row, like the old coarseLayout).
+export function nodeLayout(width: number, top: number, mode: BoxMode): NodeLayout {
+  const boxH = mode === "art" ? BOX_H_ART : BOX_H_GLYPH;
+  const showLabels = width >= rowNeed(5, BOX_W, GAP_LABEL);
+  const showTrigger = width >= rowNeed(5, BOX_W, GAP_MIN);
+  const row = showTrigger ? [...ROW_FULL] : ROW_FULL.slice(1);
+  const boxW = showTrigger || width >= rowNeed(4, BOX_W, GAP_MIN) ? BOX_W : BOX_W_NARROW;
+  const n = row.length;
+  const gap = Math.max(GAP_SQUEEZE, Math.floor((width - LEFT - 2 - n * boxW) / (n - 1)));
+  const boxes = new Map<string, Rect>();
+  row.forEach((k, i) => boxes.set(k, { x: LEFT + i * (boxW + gap), y: top, w: boxW, h: boxH }));
+  return { boxes, row, mode, boxW, boxH, showTrigger, showLabels };
+}

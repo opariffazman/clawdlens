@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
 import { coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, railCells, railSegment, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH } from "../src/core/pipeline-geometry";
 import type { PipeKind } from "../src/core/pipeline";
 
 test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at the target port", () => {
@@ -144,4 +145,30 @@ test("railSegment is an ordered horizontal run between two cards' stub columns",
   const rev = railSegment(b, a, railY);
   expect(rev[0]!.x).toBe(25);
   expect(rev[rev.length - 1]!.x).toBe(7);
+});
+
+test("nodeLayout full width: trigger + labels, 5 boxes in row order, non-overlapping", () => {
+  const nl = nodeLayout(150, TOP, "art");
+  expect(nl.row).toEqual(["prompt", "think", "tool", "result", "chat"]);
+  expect(nl.showTrigger).toBe(true);
+  expect(nl.showLabels).toBe(true);
+  expect(nl.boxW).toBe(BOX_W);
+  expect(nl.boxH).toBe(BOX_H_ART);
+  const rects = nl.row.map((k) => nl.boxes.get(k)!);
+  for (let i = 0; i + 1 < rects.length; i++) expect(rects[i + 1]!.x).toBeGreaterThan(rects[i]!.x + rects[i]!.w);
+});
+
+test("nodeLayout width ladder: labels drop, then trigger drops, then boxes narrow", () => {
+  expect(nodeLayout(104, TOP, "art").showLabels).toBe(false);
+  expect(nodeLayout(104, TOP, "art").showTrigger).toBe(true);
+  const noTrig = nodeLayout(80, TOP, "art");
+  expect(noTrig.showTrigger).toBe(false);
+  expect(noTrig.row).toEqual(["think", "tool", "result", "chat"]);
+  expect(noTrig.boxW).toBe(BOX_W);
+  expect(nodeLayout(60, TOP, "art").boxW).toBe(BOX_W_NARROW);
+});
+
+test("nodeLayout glyph mode uses the short box height", () => {
+  expect(nodeLayout(150, TOP, "glyph").boxH).toBe(BOX_H_GLYPH);
+  expect(nodeLayout(150, 5, "glyph").boxes.get("think")!.y).toBe(5);
 });
