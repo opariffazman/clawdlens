@@ -8,10 +8,10 @@ export const TOP = 1;
 
 export type BoxMode = "art" | "glyph";
 export const BOX_W = 13;
+export const BOX_W_WIDE = 17;        // wide tier: holds the 13x5 braille art
 export const BOX_W_NARROW = 9;
 export const BOX_H_ART = 7;
 export const BOX_H_GLYPH = 5;
-export const NAME_ROWS = 2;          // name + detail line below each box
 export const SUB_ROWS = 7;           // ┆ + fan + ┆ + 3-row circle + label
 export const SUB_W = 5;
 export const SUB_H = 3;
@@ -29,6 +29,7 @@ export interface NodeLayout {
   boxH: number;
   showTrigger: boolean;
   showLabels: boolean;
+  wide: boolean;
 }
 
 function rowNeed(n: number, bw: number, gap: number): number {
@@ -42,13 +43,14 @@ export function nodeLayout(width: number, top: number, mode: BoxMode): NodeLayou
   const showLabels = width >= rowNeed(5, BOX_W, GAP_LABEL);
   const showTrigger = width >= rowNeed(5, BOX_W, GAP_MIN);
   const row = showTrigger ? [...ROW_FULL] : ROW_FULL.slice(1);
-  const boxW = showTrigger || width >= rowNeed(4, BOX_W, GAP_MIN) ? BOX_W : BOX_W_NARROW;
+  const wide = mode === "art" && width >= rowNeed(5, BOX_W_WIDE, GAP_LABEL);
+  const boxW = wide ? BOX_W_WIDE : showTrigger || width >= rowNeed(4, BOX_W, GAP_MIN) ? BOX_W : BOX_W_NARROW;
   const n = row.length;
   const eff = Math.max(width, rowNeed(n, boxW, GAP_SQUEEZE)); // floor: row may overflow tiny widths; panel clips
   const gap = Math.max(GAP_SQUEEZE, Math.floor((eff - LEFT - 2 - n * boxW) / (n - 1)));
   const boxes = new Map<string, Rect>();
   row.forEach((k, i) => boxes.set(k, { x: LEFT + i * (boxW + gap), y: top, w: boxW, h: boxH }));
-  return { boxes, row, mode, boxW, boxH, showTrigger, showLabels };
+  return { boxes, row, mode, boxW, boxH, showTrigger, showLabels, wide };
 }
 
 // Border cells ordered CLOCKWISE from the top-left corner — the box draw and the

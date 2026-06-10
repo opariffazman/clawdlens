@@ -1,25 +1,7 @@
-import type { IconKey } from "../../../core/types";
+// Re-export of the generated art (see scripts/gen-icon-art.ts / bun run gen:art).
+export { ICON_ART_7, ICON_ART_13, LABEL_ART, LABEL_H, type ArtKey } from "./iconArt.gen";
+export const ART_W7 = 7;
+export const ART_H7 = 3;
+export const ART_W13 = 13;
+export const ART_H13 = 5;
 
-// Hand-crafted n8n-style "huge" icons: 7×3 cells of single-width block/box/
-// geometric glyphs ONLY (no emoji/wide glyphs — tmux ghosting gotcha).
-// Visual polish is welcome as long as tests/icon-art.test.ts stays green.
-export const ART_W = 7;
-export const ART_H = 3;
-
-export type ArtKey = IconKey | "prompt";
-
-export const ICON_ART: Record<ArtKey, [string, string, string]> = {
-  prompt:   ["▗▄▄▄▄▄▖", "▐█████▌", " ▝▜▘▀▀ "],  // speech bubble, tail left
-  thinking: [" ▄███▄ ", " ▀███▀ ", "  ▘█▝  "],  // lightbulb
-  text:     ["▗▄▄▄▄▄▖", "▐ ▪ ▪ ▌", " ▀▀▀▜▘ "],  // chat bubble, typing dots
-  tool:     ["▗▖ ▗▄▖ ", " ▜█▛▀▘ ", "  ▐█▖  "],  // wrench
-  bash:     ["▛▀▀▀▀▀▜", "▌▸ ▖  ▐", "▙▄▄▄▄▄▟"],  // terminal, prompt caret
-  edit:     ["    ▗▄▖", "  ▗▟█▛ ", " ▟█▛▘  "],  // pencil, diagonal
-  read:     ["▛▀▀▀▀▜ ", "▌▪▪▪ ▐ ", "▙▄▄▄▄▟ "],  // document with lines
-  search:   [" ▄▀▀▄  ", " ▀▄▄▀  ", "    ▝▙ "],  // magnifier
-  web:      [" ▗▄█▄▖ ", "▐██▌██▌", " ▝▀█▀▘ "],  // globe with meridian
-  task:     ["  ▟█▙  ", " ▞ █ ▚ ", "▐▌▐█▌▐▌"],  // fan-out / sitemap
-  skill:    ["  ▗▙▖  ", "▄▟███▙▄", " ▝▛▀▜▘ "],  // star
-  todo:     ["▣ ▬▬▬▬ ", "▣ ▬▬▬▬ ", "▢ ▬▬▬▬ "],  // checklist
-  result:   ["     ▗▟", "▜▖  ▟▛ ", " ▜▙▟▛  "],  // check mark
-};
