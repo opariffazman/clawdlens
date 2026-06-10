@@ -6,10 +6,20 @@
 
 Terminal glass box for your Claude Code sessions. A passive observer that tails
 `~/.claude/projects/**/*.jsonl` and shows — at a calm, slow-burn pace — what every
-running session is doing: a live **Lens** pipeline of its thinking, tools, skills and
-results; an animated metro **Flow** of its actions; live status; a token/cost/context
-gauge; a file heatmap; an agnostic task list; and a git commit-graph. Zero setup. No
-hooks. Never leave the terminal.
+running session is doing. Zero setup. No hooks. Never leave the terminal.
+
+<p align="center">
+  <img src="assets/demo.gif"
+       alt="ClawdLens replaying a Claude Code session across its Lens, Files, Tasks, Git and Log panels"
+       width="900">
+</p>
+
+The default view is the **Lens** — an n8n-style pipeline of the session's thinking →
+tools → results, with a superpowers phase ribbon (Brainstorm → Spec → Plan → Execute →
+Review → Ship), skills and subagents as sub-nodes, and a NOW heads-up display. Tab
+through the rest: a **Files** heatmap, an agnostic **Tasks** list, a **Git** commit-graph,
+and a **Log** of the raw event stream with an energy pulse. A header gauge tracks
+status, tokens, cost and context the whole time.
 
 ## Install
 
@@ -44,14 +54,35 @@ No Nerd Font? Use the plain-Unicode icon set:
 CL_ICONS=unicode clawdlens
 ```
 
+## Panels
+
+`Tab`/`Shift-Tab` cycles between five views of the selected session. Every panel reads
+off one shared timeline cursor, so they reveal and animate in sync.
+
+- **Lens** *(default)* — an n8n-style pipeline canvas. Trigger half-pill and stage boxes
+  (prompt → think → tool → result → chat) drawn with braille [lucide](https://lucide.dev)
+  icons, persistent green trail wires labelled with traversal counts, and a coral ring
+  orbiting the active node. Skills and subagents hang off as dashed sub-nodes; press `i`
+  to flip the sub-row to a per-tool breakdown. Above it, a superpowers phase ribbon
+  (Brainstorm → Spec → Plan → Execute → Review → Ship) and skill-timeline bands; below it,
+  a NOW heads-up display with the live status and pace. A long think makes the box breathe.
+- **Files** — a heatmap of every file the session touched, ranked by edits (`:sort` to
+  re-rank by reads or recency).
+- **Tasks** — an agnostic task list reconstructed from TodoWrite, the harness'
+  TaskCreate/TaskUpdate events, and a superpowers-phase fallback.
+- **Git** — a commit-graph of the session's repo, lanes coloured per branch, building up
+  with a pulse.
+- **Log** — the raw narrative event stream (thinking / text / tool / skill / result) with
+  an energy pulse that runs while the timeline moves.
+
 ## Keys
 
 `:` command palette (fuzzy) · `Tab`/`Shift-Tab` panels · `↑`/`↓` scrub timeline ·
 `←`/`→` speed · `space` pause/play · `r` replay · `i` lens detail · `?` help · `q` quit.
 
 Sessions live behind the palette: `:` → `sessions`, then `/` to fuzzy-filter the list.
-The energy-pulse animation now runs automatically whenever the timeline is moving — no
-toggle. Quitting with `q` restores the terminal cleanly (no Ctrl+C needed).
+The energy pulse runs automatically whenever the timeline is moving — no toggle. Quitting
+with `q` restores the terminal cleanly (no Ctrl+C needed).
 
 ## How it works
 
