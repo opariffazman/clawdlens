@@ -253,6 +253,23 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();
+        if (presented.length === 0) {
+          const t = "CLAWDLENS";
+          const slickM = measureText({ text: t, font: "slick" });
+          const useSlick = slickM.width <= width - 6 && hudTop - TOP >= slickM.height + 3;
+          const font = useSlick ? "slick" : "tiny";
+          const fm = useSlick ? slickM : measureText({ text: t, font: "tiny" });
+          const sx = Math.max(LEFT, (width - fm.width) >> 1);
+          const sy = Math.max(TOP, TOP + ((hudTop - TOP - fm.height - 2) >> 1));
+          renderFontToFrameBuffer(buffer, {
+            text: t, x: sx, y: sy, font,
+            color: useSlick ? [RGBA.fromHex(theme.coral), RGBA.fromHex(theme.dim)] : RGBA.fromHex(theme.coral),
+          });
+          const hint = "waiting for session activity · : sessions";
+          drawStr(buffer, Math.max(LEFT, (width - hint.length) >> 1), sy + fm.height + 1, hint, RGBA.fromHex(theme.dim), width, height);
+          drawHud(buffer, flow, status, 0, total, cursor, width, height);
+          return;
+        }
         if (showRibbon) drawPhaseRibbon(buffer, LEFT, TOP, lensState, animating, now, width, height);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
         const hotHex = flow.main.errored ? theme.err : theme.ok;
