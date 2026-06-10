@@ -32,7 +32,7 @@ Findings verified against the real n8n editor (live template-page embeds, 9 scre
 - **Ports on the border**: `○` replaces the mid-left border cell (input), `●` the mid-right (output).
 - **Corner badges** (bottom-right border cell, inside-corner): green `✓` when the stage has completed runs; red `✗` when the last run failed (with red border).
 - **Trigger node** (user prompt): `╭`/`╰` rounded left corners, `┐`/`┘` square right; coral `⚡` 1 cell outside-left at mid-height. Name `prompt`, detail `×N turns`. No input port.
-- **Sub-node**: 3×3 rounded mini-box (`╭─╮ │✦│ ╰─╯`, circle read), glyph centered, **name centered below**, `◇` top-border port. Live agents breathe their glyph; finished sub-nodes dim.
+- **Sub-node**: 5×3 rounded mini-box (`╭───╮ │ ✦ │ ╰───╯`, circle read), glyph centered, **name centered below**, `◇` top-border port. Live agents breathe their glyph; finished sub-nodes dim.
 
 ### Topology & layout
 
