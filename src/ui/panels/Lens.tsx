@@ -36,7 +36,7 @@ interface Props {
 const TRAIL_HOPS = 3;
 const RING_MS = 1500;
 const RING_WAIT_MS = 4500;
-const STAGE_GLYPH: Record<string, IconKey> = { think: "thinking", tool: "tool", result: "result", chat: "text" };
+const STAGE_GLYPH: Record<string, IconKey> = { prompt: "text", think: "thinking", tool: "tool", result: "result", chat: "text" };
 const STAGE_ART: Record<string, ArtKey> = { prompt: "prompt", think: "thinking", tool: "tool", result: "result", chat: "text" };
 
 interface SubItem { glyph: string; label: string; live: boolean; hex: string }
@@ -107,7 +107,7 @@ function drawSubNode(buf: OptimizedBuffer, c: Rect, it: SubItem, labelY: number,
   put(buf, p.x, p.y, "◇", RGBA.fromHex(theme.dim), w, h);
   put(buf, c.x + (c.w >> 1), c.y + (c.h >> 1), it.glyph, RGBA.fromHex(hex), w, h);
   const lbl = clip(it.label, 14);
-  drawStr(buf, c.x + (c.w >> 1) - (lbl.length >> 1), labelY, lbl, RGBA.fromHex(it.live ? theme.fg : theme.dim), w, h);
+  drawStr(buf, Math.max(0, c.x + (c.w >> 1) - (lbl.length >> 1)), labelY, lbl, RGBA.fromHex(it.live ? theme.fg : theme.dim), w, h);
 }
 
 function drawHud(buf: OptimizedBuffer, flow: ReturnType<typeof deriveFlow>, status: Status, tempo: number, total: number, cursor: number, w: number, h: number) {
@@ -238,7 +238,8 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const a = nl.boxes.get(row[i]!)!, b = nl.boxes.get(row[i + 1]!)!;
           const hex = i >= hotLo && i <= hotHi ? hotHex : cover[i]! > 0 ? lerpHex(theme.wireDim, theme.ok, 0.35) : theme.wireDim;
           const lbl = nl.showLabels && row[i] !== "prompt" && cover[i]! > 0 ? `×${cover[i]}` : undefined;
-          for (const c of wireForward(a, b, lbl)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(hex), width, height);
+          const col = RGBA.fromHex(hex);
+          for (const c of wireForward(a, b, lbl)) put(buffer, c.x, c.y, c.ch, col, width, height);
         }
 
         // backward loop (rounded U below the row)
@@ -247,13 +248,15 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const a = nl.boxes.get(la) ?? nl.boxes.get("chat")!;
           const b = nl.boxes.get(lb) ?? nl.boxes.get("think")!;
           const hex = hotBack ? hotHex : lerpHex(theme.wireDim, theme.ok, 0.35);
-          for (const c of wireLoop(a, b, channelY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(hex), width, height);
+          const col = RGBA.fromHex(hex);
+          for (const c of wireLoop(a, b, channelY)) put(buffer, c.x, c.y, c.ch, col, width, height);
         }
 
         // sub-row: dashed tree fan + circles
         if (sr) {
           const d = diamondCell(nl.boxes.get("tool")!);
-          for (const c of sr.cells) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+          const wireDimCol = RGBA.fromHex(theme.wireDim);
+          for (const c of sr.cells) put(buffer, c.x, c.y, c.ch, wireDimCol, width, height);
           sr.circles.forEach((c, i) => drawSubNode(buffer, c, items[i]!, sr.labelY, now, animating, width, height));
           put(buffer, d.x, d.y, "◇", RGBA.fromHex(theme.dim), width, height);
           if (items.length > sr.shown && sr.circles.length > 0) {
@@ -285,13 +288,17 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           // trigger bolt
           if (k === "prompt") {
             const b = boltCell(r);
-            put(buffer, b.x, b.y, "⚡", RGBA.fromHex(theme.coral), width, height);
+            put(buffer, b.x, b.y, "↯", RGBA.fromHex(theme.coral), width, height);
           }
         }
 
         // orbiting ring on the active (or waiting) node — n8n: errors stop the ring
         if (ringKey && animating && !flow.main.errored && status !== "error") {
-          drawRing(buffer, nl.boxes.get(ringKey)!, ringKey === "prompt", now, ringMs, width, height);
+          drawRing(buffer, nl.boxes.get(ringKey)!, ringKey === "prompt", now, ringMs, width, height); // rounded: unreachable today, future-proof for a prompt-ring
+          const rr = nl.boxes.get(ringKey)!;
+          if (ringKey !== "prompt") put(buffer, portIn(rr).x, portIn(rr).y, "○", RGBA.fromHex(theme.dim), width, height);
+          put(buffer, portOut(rr).x, portOut(rr).y, "●", RGBA.fromHex(theme.dim), width, height);
+          if ((flow.main.counts[ringKey] ?? 0) > 0) put(buffer, badgeCell(rr).x, badgeCell(rr).y, "✓", RGBA.fromHex(theme.ok), width, height);
         }
 
         // milestone burst (commit/branch) on the active box, as before
