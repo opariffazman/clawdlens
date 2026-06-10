@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { coarseLayout, pipeForward, pipeElbow, pipeReturn, pipeBranch, expandStack, railCells, railSegment, LEFT, TOP } from "../src/core/pipeline-geometry";
-import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH } from "../src/core/pipeline-geometry";
+import { nodeLayout, BOX_W, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell } from "../src/core/pipeline-geometry";
 import type { PipeKind } from "../src/core/pipeline";
 
 test("pipeForward is a horizontal run on the mid-row ending in an arrowhead at the target port", () => {
@@ -174,4 +174,30 @@ test("nodeLayout width ladder: labels drop, then trigger drops, then boxes narro
 test("nodeLayout glyph mode uses the short box height", () => {
   expect(nodeLayout(150, TOP, "glyph").boxH).toBe(BOX_H_GLYPH);
   expect(nodeLayout(150, 5, "glyph").boxes.get("think")!.y).toBe(5);
+});
+
+test("borderCells walks clockwise from top-left with sharp corners", () => {
+  const cells = borderCells({ x: 2, y: 1, w: 4, h: 3 });
+  expect(cells.length).toBe(2 * 4 + 2 * 3 - 4);
+  expect(cells[0]).toEqual({ x: 2, y: 1, ch: "┌" });
+  expect(cells[3]).toEqual({ x: 5, y: 1, ch: "┐" });
+  expect(cells.find((c) => c.x === 5 && c.y === 3)!.ch).toBe("┘");
+  expect(cells.find((c) => c.x === 2 && c.y === 3)!.ch).toBe("└");
+  expect(cells[cells.length - 1]).toEqual({ x: 2, y: 2, ch: "│" });
+});
+
+test("borderCells roundedLeft makes the trigger half-pill", () => {
+  const cells = borderCells({ x: 2, y: 1, w: 4, h: 3 }, true);
+  expect(cells[0]!.ch).toBe("╭");
+  expect(cells.find((c) => c.x === 2 && c.y === 3)!.ch).toBe("╰");
+  expect(cells[3]!.ch).toBe("┐");
+});
+
+test("port/badge/diamond/bolt cells sit on the border at the spec positions", () => {
+  const r = { x: 10, y: 2, w: 13, h: 7 };
+  expect(portIn(r)).toEqual({ x: 10, y: 5 });
+  expect(portOut(r)).toEqual({ x: 22, y: 5 });
+  expect(badgeCell(r)).toEqual({ x: 21, y: 8 });
+  expect(diamondCell(r)).toEqual({ x: 16, y: 8 });
+  expect(boltCell(r)).toEqual({ x: 9, y: 5 });
 });

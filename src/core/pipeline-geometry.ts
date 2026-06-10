@@ -189,3 +189,38 @@ export function nodeLayout(width: number, top: number, mode: BoxMode): NodeLayou
   row.forEach((k, i) => boxes.set(k, { x: LEFT + i * (boxW + gap), y: top, w: boxW, h: boxH }));
   return { boxes, row, mode, boxW, boxH, showTrigger, showLabels };
 }
+
+// Border cells ordered CLOCKWISE from the top-left corner — the box draw and the
+// orbiting ring share this array (the ring recolors a window of it).
+export function borderCells(r: Rect, roundedLeft = false): Cell[] {
+  const cells: Cell[] = [];
+  const x1 = r.x + r.w - 1, y1 = r.y + r.h - 1;
+  cells.push({ x: r.x, y: r.y, ch: roundedLeft ? "╭" : "┌" });
+  for (let x = r.x + 1; x < x1; x++) cells.push({ x, y: r.y, ch: "─" });
+  cells.push({ x: x1, y: r.y, ch: "┐" });
+  for (let y = r.y + 1; y < y1; y++) cells.push({ x: x1, y, ch: "│" });
+  cells.push({ x: x1, y: y1, ch: "┘" });
+  for (let x = x1 - 1; x > r.x; x--) cells.push({ x, y: y1, ch: "─" });
+  cells.push({ x: r.x, y: y1, ch: roundedLeft ? "╰" : "└" });
+  for (let y = y1 - 1; y > r.y; y--) cells.push({ x: r.x, y, ch: "│" });
+  return cells;
+}
+
+export function portIn(r: Rect): { x: number; y: number } {
+  return { x: r.x, y: r.y + (r.h >> 1) };
+}
+export function portOut(r: Rect): { x: number; y: number } {
+  return { x: r.x + r.w - 1, y: r.y + (r.h >> 1) };
+}
+// n8n status badge: inside the bottom-right corner, on the border row
+export function badgeCell(r: Rect): { x: number; y: number } {
+  return { x: r.x + r.w - 2, y: r.y + r.h - 1 };
+}
+// ◇ sub-node port, bottom-border center
+export function diamondCell(r: Rect): { x: number; y: number } {
+  return { x: r.x + (r.w >> 1), y: r.y + r.h - 1 };
+}
+// ⚡ floats one cell outside the trigger's left edge (n8n bolt)
+export function boltCell(r: Rect): { x: number; y: number } {
+  return { x: r.x - 1, y: r.y + (r.h >> 1) };
+}
