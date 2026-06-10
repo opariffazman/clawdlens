@@ -58,17 +58,17 @@ test("breathe stays within [0.6,1] and repeats by period", () => {
 });
 
 test("shouldAnimate: only live + recently advanced", () => {
-  // mode not live → never animate
+  // mode not playing → never animate
   expect(shouldAnimate("paused", 1000, 200, 1100)).toBe(false);
-  expect(shouldAnimate("history", 1000, 200, 1100)).toBe(false);
-  // live, never advanced (lastAdvanceMs < 0) → false
-  expect(shouldAnimate("live", -1, 200, 5000)).toBe(false);
-  // live, bad interval → false
-  expect(shouldAnimate("live", 1000, 0, 1100)).toBe(false);
-  // live, just advanced → true
-  expect(shouldAnimate("live", 1000, 200, 1100)).toBe(true);
-  // live, within ~2 intervals → true
-  expect(shouldAnimate("live", 1000, 200, 1390)).toBe(true);
-  // live, gone quiet (> 2 intervals) → false
-  expect(shouldAnimate("live", 1000, 200, 1500)).toBe(false);
+  expect(shouldAnimate("paused", 1000, 200, 1100)).toBe(false);
+  // playing, never advanced (lastAdvanceMs < 0) → false
+  expect(shouldAnimate("playing", -1, 200, 5000)).toBe(false);
+  // playing, bad interval → false
+  expect(shouldAnimate("playing", 1000, 0, 1100)).toBe(false);
+  // playing, just advanced → true
+  expect(shouldAnimate("playing", 1000, 200, 1100)).toBe(true);
+  // playing, within ~2 intervals → true
+  expect(shouldAnimate("playing", 1000, 200, 1390)).toBe(true);
+  // playing, gone quiet (> 2 intervals) → false
+  expect(shouldAnimate("playing", 1000, 200, 1500)).toBe(false);
 });
