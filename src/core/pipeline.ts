@@ -3,18 +3,6 @@ import type { Beat, BeatKind } from "./types";
 export type PipeKind = "think" | "tool" | "skill" | "result" | "chat";
 export type Grain = "coarse" | "fine";
 
-const SLOT: Record<PipeKind, { col: number; row: number }> = {
-  think:  { col: 0, row: 0 },
-  tool:   { col: 1, row: 0 },
-  skill:  { col: 1, row: 1 },
-  result: { col: 2, row: 0 },
-  chat:   { col: 3, row: 0 },
-};
-
-export function slotOf(kind: PipeKind): { col: number; row: number } {
-  return SLOT[kind];
-}
-
 const COARSE_OF: Partial<Record<BeatKind, string>> = {
   thinking: "think", text: "chat", skill: "skill", tool: "tool",
 };

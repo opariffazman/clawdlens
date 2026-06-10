@@ -2,6 +2,7 @@ import { RGBA } from "@opentui/core";
 
 export const theme = {
   accent: "#00E5FF",
+  coral: "#FF6D5A",   // n8n primary — Lens ring, trigger bolt, active accents
   dim: "#5A6472",
   fg: "#C8D0DA",
   ok: "#5AF78E",

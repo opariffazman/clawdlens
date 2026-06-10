@@ -152,3 +152,18 @@ test("activeSkill is the head skill beat's name, else null", () => {
   expect(deriveFlow([beat({ kind: "tool", iconKey: "bash" })], 1, 5).main.activeSkill).toBeNull();
   expect(deriveFlow([beat({ kind: "thinking" })], 1, 5).main.activeSkill).toBeNull();
 });
+
+test("hops counts distinct-collapsed transitions; lastHop is the newest", () => {
+  const f = deriveFlow([
+    beat({ kind: "thinking" }), beat({ kind: "tool", ok: true }),   // think>tool, tool>result
+    beat({ kind: "thinking" }), beat({ kind: "tool" }),             // result>think, think>tool
+  ], 4, 3);
+  expect(f.main.hops).toEqual({ "think>tool": 2, "tool>result": 1, "result>think": 1 });
+  expect(f.main.lastHop).toBe("think>tool");
+});
+
+test("hops empty and lastHop null with fewer than two distinct steps", () => {
+  const f = deriveFlow([beat({ kind: "thinking" }), beat({ kind: "thinking" })], 2, 3);
+  expect(f.main.hops).toEqual({});
+  expect(f.main.lastHop).toBeNull();
+});

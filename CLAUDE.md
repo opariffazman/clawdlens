@@ -30,6 +30,7 @@ src/core/   (pure, TDD)
   reducer.ts       applyEntry folds entry → SessionState (beats, fileHeat, todos, tasks, subagent lanes, iconKey). returns shallow copy — replace collections immutably
   lens.ts          superpowers phase detector (Brainstorm→Spec→Plan→Execute→Review→Ship)
   flow-layout.ts   beats → FlowGraph (lanes/nodes/segments, ROW_STRIDE). git-graph reuses shape
+  pipeline-geometry.ts  n8n node-row layout: width ladder, border/port/badge cells, straight+rounded wires, sub-row tree fan
   git-log.ts       parseGitLog(stdout)→Commit[]; GIT_LOG_ARGS (--all --no-patch, %H%P%D%s)
   git-graph.ts     layoutGitGraph(commits)→FlowGraph (git log --graph lane algo: 1st parent continues, extra parents branch, converging lanes rejoin)
   player.ts        paced coalescing player: cursor, modes live/paused/history, replay+loop, ONE adaptive interval
@@ -40,7 +41,8 @@ src/store/
 src/ui/
   App.tsx          layout, keyboard, selection (by id), shared progress, replay state
   Showcase.tsx     full-width: Header + TabBar + active panel (+ CommandBox overlay on `:`). PanelId = lens|files|tasks|git|log; default = lens
-  panels/Lens.tsx  default: live n8n-style pipeline HUD (think→tool→skill→result→chat), comet/pulse, `i` per-action expand
+  panels/Lens.tsx  default: n8n-style canvas — trigger half-pill + stage boxes (block-art icons, names below), skills/agents as dashed sub-nodes, persistent green trail wires, orbiting coral ring on the active node; `i` flips sub-row to tool breakdown
+  panels/lens/     Lens helpers: iconArt.ts (13 hand-crafted 7×3 block-art glyphs, single-width only), draw.ts, phaseRibbon/economy/heartbeat/skillTimeline bands
   panels/Flow.tsx  Log panel: buffered metro graph + energy pulse (setCell + RGBA, live)
   panels/Files.tsx file heatmap (full-session fileHeat)
   panels/Tasks.tsx agnostic: TodoWrite + reconstructed TaskCreate/TaskUpdate + superpowers phase fallback

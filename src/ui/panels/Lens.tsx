@@ -1,12 +1,18 @@
 import { RGBA, type OptimizedBuffer } from "@opentui/core";
-import { deriveFlow, type LaneFlow } from "../../core/pipeline-flow";
-import { coarseLayout, pipeReturn, pipeBranch, pipeElbow, expandStack, railCells, railSegment, type Rect, type Cell, LEFT, TOP, CARD_H, ROW_GAP } from "../../core/pipeline-geometry";
+import { deriveFlow } from "../../core/pipeline-flow";
+import {
+  nodeLayout, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell,
+  wireForward, wireLoop, subRow, subPortCell,
+  NAME_ROWS, SUB_ROWS, BOX_H_ART, BOX_H_GLYPH, LEFT, TOP,
+  type BoxMode, type NodeLayout, type Rect,
+} from "../../core/pipeline-geometry";
 import { rankOf } from "../../core/pipeline";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
-import { pulsePhase, cometColor, breathe, lerpHex } from "../anim";
+import { breathe, lerpHex, pulsePhase } from "../anim";
 import { iconFor } from "../icons";
 import { put, drawStr, clip, laneHexOf } from "./lens/draw";
+import { ICON_ART, ART_W, ART_H, type ArtKey } from "./lens/iconArt";
 import { detectLensFromBeats } from "../../core/lens";
 import { drawPhaseRibbon } from "./lens/phaseRibbon";
 import { drawEconomy } from "./lens/economy";
@@ -28,30 +34,18 @@ interface Props {
 }
 
 const TRAIL_HOPS = 3;
-const TAIL = 6;
-const MAX_CHILDREN = 6;
-const SKILL_SIDE_MIN = 16; // min (skill.x - tool.x) to render skill side-by-side; else stack under tool
-const COARSE_STAGES = ["think", "tool", "result", "chat"];
-const STAGE_ICON: Record<string, IconKey> = { think: "thinking", tool: "tool", skill: "skill", result: "result", chat: "text" };
+const RING_MS = 1500;
+const RING_WAIT_MS = 4500;
+const STAGE_GLYPH: Record<string, IconKey> = { prompt: "text", think: "thinking", tool: "tool", result: "result", chat: "text" };
+const STAGE_ART: Record<string, ArtKey> = { prompt: "prompt", think: "thinking", tool: "tool", result: "result", chat: "text" };
+
+interface SubItem { glyph: string; label: string; live: boolean; hex: string }
 
 function statusHex(s: Status) {
   return s === "error" ? theme.err : s === "waiting" ? theme.warn : s === "idle" || s === "dormant" ? theme.dim : theme.ok;
 }
 
-function drawCard(buf: OptimizedBuffer, r: Rect, icon: string, name: string, content: string, contentFg: RGBA, border: RGBA, active: boolean, w: number, h: number) {
-  const title = ` ${icon} ${name} `;
-  put(buf, r.x, r.y, "╭", border, w, h);
-  put(buf, r.x + r.w - 1, r.y, "╮", border, w, h);
-  for (let i = 1; i < r.w - 1; i++) { const ch = title[i - 1]; put(buf, r.x + i, r.y, ch ?? "─", ch ? contentFg : border, w, h); }
-  put(buf, r.x, r.y + 1, "│", border, w, h);
-  put(buf, r.x + r.w - 1, r.y + 1, "│", border, w, h);
-  drawStr(buf, r.x + 1, r.y + 1, clip(content, r.w - 3), contentFg, w, h);
-  if (active) put(buf, r.x + r.w - 2, r.y + 1, "◉", border, w, h);
-  put(buf, r.x, r.y + r.h - 1, "╰", border, w, h);
-  put(buf, r.x + r.w - 1, r.y + r.h - 1, "╯", border, w, h);
-  for (let i = 1; i < r.w - 1; i++) put(buf, r.x + i, r.y + r.h - 1, "─", border, w, h);
-}
-
+// milestone sparkle on the active box (ported unchanged from the old Lens)
 function drawBurst(buf: OptimizedBuffer, cx: number, cy: number, kind: "commit" | "branch", phase: number, laneHex: string, w: number, h: number) {
   const r = Math.min(2, Math.round(phase * 2));
   const fade = 1 - phase;
@@ -66,7 +60,60 @@ function drawBurst(buf: OptimizedBuffer, cx: number, cy: number, kind: "commit" 
   }
 }
 
-function drawHud(buf: OptimizedBuffer, flow: { main: LaneFlow; agentsLive: number }, status: Status, tempo: number, total: number, cursor: number, w: number, h: number) {
+// box: border + centered art/glyph + name/detail BELOW (n8n anatomy)
+function drawNodeBox(
+  buf: OptimizedBuffer, r: Rect, mode: BoxMode, key: string,
+  name: string, detail: string, border: RGBA, iconHex: string, nameFg: RGBA,
+  w: number, h: number,
+) {
+  for (const c of borderCells(r, key === "prompt")) put(buf, c.x, c.y, c.ch, border, w, h);
+  const icon = RGBA.fromHex(iconHex);
+  if (mode === "art") {
+    const rows = ICON_ART[STAGE_ART[key] ?? "tool"];
+    const ax = r.x + ((r.w - ART_W) >> 1);
+    const ay = r.y + ((r.h - ART_H) >> 1);
+    rows.forEach((row, i) => {
+      for (let j = 0; j < row.length; j++) if (row[j] !== " ") put(buf, ax + j, ay + i, row[j]!, icon, w, h);
+    });
+  } else {
+    put(buf, r.x + (r.w >> 1), r.y + (r.h >> 1), iconFor(STAGE_GLYPH[key] ?? "tool"), icon, w, h);
+  }
+  const nm = clip(name, r.w + 2);
+  drawStr(buf, r.x + ((r.w - nm.length) >> 1), r.y + r.h, nm, nameFg, w, h);
+  const dt = clip(detail, r.w + 2);
+  if (dt) drawStr(buf, r.x + ((r.w - dt.length) >> 1), r.y + r.h + 1, dt, RGBA.fromHex(theme.dim), w, h);
+}
+
+// orbiting coral ring: recolor the border cells with a chasing arc (n8n conic ring)
+function drawRing(buf: OptimizedBuffer, r: Rect, rounded: boolean, now: number, periodMs: number, w: number, h: number) {
+  const cells = borderCells(r, rounded);
+  const head = Math.floor(((now % periodMs) / periodMs) * cells.length);
+  const arc = Math.max(4, cells.length >> 2);
+  const base = lerpHex(theme.dim, theme.coral, 0.2);
+  const hot = lerpHex(theme.coral, theme.pulseHot, 0.6);
+  cells.forEach((c, i) => {
+    const d = (i - head + cells.length) % cells.length;
+    // conic fade: hot at the head, easing to base over the whole arc (n8n-style)
+    const hex = d < arc ? lerpHex(base, hot, 1 - d / arc) : base;
+    put(buf, c.x, c.y, c.ch, RGBA.fromHex(hex), w, h);
+  });
+}
+
+function drawSubNode(buf: OptimizedBuffer, c: Rect, it: SubItem, labelY: number, now: number, animating: boolean, w: number, h: number) {
+  const hex = it.live && animating ? lerpHex(it.hex, theme.pulseHot, breathe(now)) : it.hex;
+  const border = RGBA.fromHex(it.live ? hex : theme.dim);
+  for (const cell of borderCells(c)) {
+    const rounded = cell.ch === "┌" ? "╭" : cell.ch === "┐" ? "╮" : cell.ch === "└" ? "╰" : cell.ch === "┘" ? "╯" : cell.ch;
+    put(buf, cell.x, cell.y, rounded, border, w, h);
+  }
+  const p = subPortCell(c);
+  put(buf, p.x, p.y, "◇", RGBA.fromHex(theme.dim), w, h);
+  put(buf, c.x + (c.w >> 1), c.y + (c.h >> 1), it.glyph, RGBA.fromHex(hex), w, h);
+  const lbl = clip(it.label, 14);
+  drawStr(buf, Math.max(0, c.x + (c.w >> 1) - (lbl.length >> 1)), labelY, lbl, RGBA.fromHex(it.live ? theme.fg : theme.dim), w, h);
+}
+
+function drawHud(buf: OptimizedBuffer, flow: ReturnType<typeof deriveFlow>, status: Status, tempo: number, total: number, cursor: number, w: number, h: number) {
   const bandH = 4;
   const top = h - bandH;
   if (top < TOP + 2) return;
@@ -80,7 +127,7 @@ function drawHud(buf: OptimizedBuffer, flow: { main: LaneFlow; agentsLive: numbe
   drawStr(buf, LEFT + 2, top, " NOW ", RGBA.fromHex(theme.accent), w, h);
   const m = flow.main;
   const nowLine = m.activeKind
-    ? `${iconFor(m.actionIcon ?? STAGE_ICON[m.activeKind] ?? "tool")} ${m.activeKind}${m.detail ? " · " + m.detail : ""}`
+    ? `${iconFor(m.actionIcon ?? STAGE_GLYPH[m.activeKind] ?? "tool")} ${m.activeKind}${m.detail ? " · " + m.detail : ""}`
     : "idle";
   drawStr(buf, LEFT + 2, top + 1, clip(nowLine, w - 6), RGBA.fromHex(m.errored ? theme.err : theme.fg), w, h);
   const succTotal = m.ok + m.err;
@@ -93,125 +140,89 @@ function drawHud(buf: OptimizedBuffer, flow: { main: LaneFlow; agentsLive: numbe
   drawStr(buf, cx, top + 2, clip(rest, w - cx - 3), RGBA.fromHex(theme.dim), w, h);
 }
 
-function drawSubLane(buf: OptimizedBuffer, ln: LaneFlow, y: number, now: number, animating: boolean, w: number, h: number) {
-  const taskHex = theme.laneColors[5 % theme.laneColors.length]!;
-  put(buf, LEFT + 2, y, iconFor("task"), RGBA.fromHex(taskHex), w, h);
-  drawStr(buf, LEFT + 4, y, clip(ln.label, 14), RGBA.fromHex(theme.dim), w, h);
-  if (!ln.activeKind) return;
-  const x = LEFT + 20;
-  const laneHex = laneHexOf(ln.activeKind);
-  const headi = animating ? Math.floor((now / 120) % 3) : 99;
-  for (let i = 0; i < 3; i++) put(buf, x + i, y, "·", RGBA.fromHex(i === headi ? laneHex : theme.wireDim), w, h);
-  const glyph = ln.errored ? "✗" : iconFor(ln.actionIcon ?? (STAGE_ICON[ln.activeKind] ?? ln.activeKind) as IconKey);
-  const col = ln.errored ? theme.err : (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex);
-  put(buf, x + 4, y, glyph, RGBA.fromHex(col), w, h);
-}
-
-// pick the routed pipe for a transition between two coarse kinds
-function wireFor(from: string, to: string, layout: Map<string, Rect>, channelY: number, railY: number): Cell[] {
-  const a = layout.get(from); const b = layout.get(to);
-  if (!a || !b) return [];
-  if (to === "skill") return pipeElbow(a, b);
-  if (from === "skill") return pipeElbow(b, a).reverse();
-  if (a.y === b.y && b.x > a.x) return railSegment(a, b, railY); // forward flow rides the rail above
-  if (a.y === b.y && b.x < a.x) return pipeReturn(a, b, channelY);
-  return a.y < b.y ? pipeBranch(a, [b]) : pipeBranch(b, [a]).reverse();
-}
-
 export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, tokens, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const lensState = detectLensFromBeats(presented.slice(0, cursor));
   const ribbonOn = lensState.lensId === "superpowers";
-  const RIBBON_ROWS = ribbonOn ? 2 : 0; // ribbon row + 1 spacer
-  // Pulse tracks TIMELINE MOVEMENT, not the session's live status. `animate`
-  // (shouldAnimate) is already true only while the cursor is advancing (live
-  // reveal/replay) and false at rest/paused/scrub. Gating on status wrongly
-  // froze the comet for past/dormant sessions being revealed — Flow/Git gate
-  // on `animate` alone; Lens now matches.
   const animating = animate;
 
-  const hasSkill = (flow.main.counts["skill"] ?? 0) > 0;
+  // sub-row occupants: default = latest skill + live agents; `i` = tool breakdown
+  const items: SubItem[] = [];
+  if (infoOn) {
+    for (const k of Object.keys(flow.main.toolBreakdown).sort((a, b) => rankOf(a) - rankOf(b))) {
+      items.push({ glyph: iconFor(k as IconKey), label: `${k} ×${flow.main.toolBreakdown[k]}`, live: false, hex: laneHexOf("tool") });
+    }
+  } else {
+    const lastGroup = lensState.skillGroups[lensState.skillGroups.length - 1];
+    const skillName = flow.main.activeSkill ?? lastGroup?.skill;
+    if (skillName) {
+      const short = skillName.split(":").pop() ?? skillName;
+      items.push({ glyph: iconFor("skill"), label: `${short} ×${flow.main.skillBreakdown[skillName] ?? 1}`, live: flow.main.activeKind === "skill", hex: laneHexOf("skill") });
+    }
+    for (const ln of flow.subLanes) items.push({ glyph: iconFor("task"), label: ln.label, live: true, hex: laneHexOf("task") });
+  }
 
-  // expand child kinds (i): tool by rank, skill by count desc then name
-  const toolChildKinds = infoOn
-    ? Object.keys(flow.main.toolBreakdown).sort((a, b) => rankOf(a) - rankOf(b)).slice(0, MAX_CHILDREN)
-    : [];
-  const skillChildKinds = infoOn && hasSkill
-    ? Object.keys(flow.main.skillBreakdown).sort((a, b) => (flow.main.skillBreakdown[b]! - flow.main.skillBreakdown[a]!) || (a < b ? -1 : 1)).slice(0, MAX_CHILDREN)
-    : [];
-  const toolExtra = infoOn ? Object.keys(flow.main.toolBreakdown).length - toolChildKinds.length : 0;
-  const skillExtra = infoOn ? Object.keys(flow.main.skillBreakdown).length - skillChildKinds.length : 0;
-
-  // wide (side-by-side skill) vs narrow (skill under tool) — from the spread's gap
-  const probe: Map<string, Rect> = coarseLayout(width, TOP);
-  const wide = (probe.get("skill")!.x - probe.get("tool")!.x) >= SKILL_SIDE_MIN;
-
-  // vertical centering: estimate the block height (flow rail above + cards/expands),
-  // center it between TOP and the HUD band, reserving the sublane rows below.
-  const RAIL_ROWS = 2; // flow rail + a stub row above the card row
+  // height ladder: art -> glyph -> drop economy -> heartbeat -> timeline -> ribbon -> sub-row
   const bandH = 4;
   const hudTop = height - bandH;
-  const sublaneRows = flow.agentsLive > 0 ? Math.min(3, flow.agentsLive) + 1 : 0;
-  const toolN = toolChildKinds.length;
-  const skillN = skillChildKinds.length;
-  // pipeline block height WITH and WITHOUT the (optional) skill card+branch.
-  const maxBottomRelNoSkill = CARD_H + toolN + (toolExtra > 0 ? 1 : 0);
-  let maxBottomRelFull = maxBottomRelNoSkill;
-  if (hasSkill) {
-    const skillTopRel = wide ? (CARD_H + ROW_GAP) : (CARD_H + toolN + (toolExtra > 0 ? 1 : 0) + ROW_GAP);
-    maxBottomRelFull = Math.max(maxBottomRelFull, skillTopRel + CARD_H + skillN + (skillExtra > 0 ? 1 : 0));
-  }
-  const pipeFull = RAIL_ROWS + maxBottomRelFull + 1;   // rail + cards + skill card + return
-  const pipeCore = RAIL_ROWS + maxBottomRelNoSkill + 1; // rail + cards + return (skill suppressed)
-  // zones: ribbon (top) + pipeline + bottom bands + HUD. When height is tight, drop
-  // in priority order — economy -> heartbeat -> timeline -> ribbon -> skill card —
-  // until the pipeline + HUD fit, so they never overlap.
-  const ECONOMY_ROWS = 1;
-  const HEARTBEAT_ROWS = 1;
   const hasTimeline = lensState.skillGroups.length > 0 || presented.slice(0, cursor).some((b) => b.iconKey === "task");
-  const TIMELINE_ROWS = hasTimeline ? 3 : 0;
-  const usable = hudTop - TOP - sublaneRows;
-  let ribbon = RIBBON_ROWS, econ = ECONOMY_ROWS, heart = HEARTBEAT_ROWS, time = TIMELINE_ROWS, skill = hasSkill ? 1 : 0;
-  const pipeNeed = () => (skill ? pipeFull : pipeCore);
-  while (usable - ribbon - (econ + heart + time) < pipeNeed()) {
-    if (econ) econ = 0;
+  let ribbon = ribbonOn ? 2 : 0, econ = 1, heart = 1, time = hasTimeline ? 3 : 0;
+  let mode: BoxMode = "art";
+  let sub = items.length > 0 ? SUB_ROWS : 0;
+  // sub-row rows OVERLAP the name rows (trunk/fan pass behind the labels — wires
+  // run behind nodes in n8n too), so the block needs boxH + max(sub, NAME_ROWS).
+  const blockNeed = () => (mode === "art" ? BOX_H_ART : BOX_H_GLYPH) + Math.max(sub, NAME_ROWS) + 1; // +1 loop channel
+  const usable = hudTop - TOP;
+  while (usable - ribbon - econ - heart - time < blockNeed()) {
+    if (mode === "art") mode = "glyph";
+    else if (econ) econ = 0;
     else if (heart) heart = 0;
     else if (time) time = 0;
     else if (ribbon) ribbon = 0;
-    else if (skill) skill = 0;
+    else if (sub) sub = 0;
     else break;
   }
-  const showRibbon = ribbon > 0;
-  const showEconomy = econ > 0, showHeartbeat = heart > 0, showTimeline = time > 0 && TIMELINE_ROWS > 0;
-  const showSkillCard = hasSkill && skill > 0;
-  const maxBottomRel = showSkillCard ? maxBottomRelFull : maxBottomRelNoSkill;
-  const blockH = RAIL_ROWS + maxBottomRel + 1;
-  const bottomBandRows = econ + heart + time;
+  const showRibbon = ribbon > 0, showEconomy = econ > 0, showHeartbeat = heart > 0, showTimeline = time > 0;
+  const showSub = sub > 0;
+
   const regionTop = TOP + ribbon;
-  const regionBottom = hudTop - sublaneRows - bottomBandRows;
-  const blockTop = Math.max(regionTop, regionTop + Math.floor((regionBottom - regionTop - blockH) / 2));
-  const top = blockTop + RAIL_ROWS;
-  const railY = blockTop;
+  const regionBottom = hudTop - (econ + heart + time);
+  const boxH = mode === "art" ? BOX_H_ART : BOX_H_GLYPH;
+  const blockH = boxH + (showSub ? SUB_ROWS : NAME_ROWS);
+  const top = Math.max(regionTop, regionTop + ((regionBottom - regionTop - blockH) >> 1));
+  const nl: NodeLayout = nodeLayout(width, top, mode);
+  const row = nl.row;
 
-  const layout: Map<string, Rect> = coarseLayout(width, top);
-  const channelY = top + CARD_H + 1;
-
-  const toolRect = layout.get("tool")!;
-  const toolChildRects = expandStack(toolRect, toolN);
-  const toolBlockBottom = toolN > 0 ? toolChildRects[toolChildRects.length - 1]!.y + 1 + (toolExtra > 0 ? 1 : 0) : toolRect.y + CARD_H;
-
-  // place skill: wide → gap column (from coarseLayout); narrow → below the tool block
-  let skillRect = layout.get("skill")!;
-  if (hasSkill && !wide) {
-    skillRect = { x: toolRect.x, y: toolBlockBottom + ROW_GAP, w: toolRect.w, h: CARD_H };
-    layout.set("skill", skillRect);
+  // wire segment cover from hops
+  const segN = row.length - 1;
+  const cover: number[] = new Array(segN).fill(0);
+  let backCount = 0;
+  const idx = (k: string) => row.indexOf(k);
+  for (const [k, n] of Object.entries(flow.main.hops)) {
+    const gt = k.indexOf(">");
+    const ia = idx(k.slice(0, gt)), ib = idx(k.slice(gt + 1));
+    if (ia < 0 || ib < 0) continue;
+    if (ib > ia) for (let s = ia; s < ib; s++) cover[s]! += n;
+    else backCount += n;
   }
-  const skillChildRects = hasSkill ? expandStack(skillRect, skillN) : [];
+  if (nl.showTrigger && flow.main.trail.length > 0) cover[0] = Math.max(cover[0]!, 1);
+  let hotLo = -1, hotHi = -2, hotBack: [string, string] | null = null;
+  if (flow.main.lastHop) {
+    const gt = flow.main.lastHop.indexOf(">");
+    const a = flow.main.lastHop.slice(0, gt), b = flow.main.lastHop.slice(gt + 1);
+    const ia = idx(a), ib = idx(b);
+    if (ia >= 0 && ib >= 0) { if (ib > ia) { hotLo = ia; hotHi = ib - 1; } else hotBack = [a, b]; }
+  }
 
-  const presentKinds = [...COARSE_STAGES];
-  if (showSkillCard) presentKinds.push("skill");
+  const sr = showSub ? subRow(nl.boxes.get("tool")!, items.length, width) : null;
+  const nameBottom = top + boxH + NAME_ROWS;
+  const blockBottom = Math.max(nameBottom, sr ? sr.labelY + 1 : 0);
+  const channelY = blockBottom;
+  const loopOn = (backCount > 0 || hotBack !== null) && channelY < regionBottom;
 
-  const cardRects = COARSE_STAGES.map((k) => layout.get(k)!); // the four coarse cards tapped by the rail
+  const activeK = flow.main.activeKind;
+  const ringKey = status === "waiting" ? "chat" : activeK && nl.boxes.has(activeK) ? activeK : null;
+  const ringMs = status === "waiting" ? RING_WAIT_MS : RING_MS;
 
   return (
     <box
@@ -222,105 +233,85 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         buffer.clear(TRANSPARENT);
         const now = Date.now();
         if (showRibbon) drawPhaseRibbon(buffer, LEFT, TOP, lensState, animating, now, width, height);
-        const phase = pulsePhase(now, lastAdvanceMs, intervalMs);
         const tempo = intervalMs > 0 ? Math.max(0, Math.min(1, 600 / intervalMs)) : 0;
+        const hotHex = flow.main.errored ? theme.err : theme.ok;
 
-        // while tool is expanded, hide back-edge (loop) pipes — the stack uses that space
-        const expanded = toolN > 0;
-        const isReturn = (from: string, to: string) => {
-          const a = layout.get(from); const b = layout.get(to);
-          return !!a && !!b && a.y === b.y && b.x < a.x;
-        };
+        // forward wires with persistent trail + embedded ×N labels
+        for (let i = 0; i < segN; i++) {
+          const a = nl.boxes.get(row[i]!)!, b = nl.boxes.get(row[i + 1]!)!;
+          const hex = i >= hotLo && i <= hotHi ? hotHex : cover[i]! > 0 ? lerpHex(theme.wireDim, theme.ok, 0.35) : theme.wireDim;
+          const lbl = nl.showLabels && row[i] !== "prompt" && cover[i]! > 0 ? `×${cover[i]}` : undefined;
+          const col = RGBA.fromHex(hex);
+          for (const c of wireForward(a, b, lbl)) put(buffer, c.x, c.y, c.ch, col, width, height);
+        }
 
-        // static forward bus: the flow rail above the cards (with per-card stubs)
-        for (const c of railCells(cardRects, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-        // static skill branch elbow (below tool)
-        if (showSkillCard) for (const c of wireFor("tool", "skill", layout, channelY, railY)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
+        // backward loop (rounded U below the row)
+        if (loopOn) {
+          const [la, lb] = hotBack ?? ["chat", "think"];
+          const a = nl.boxes.get(la) ?? nl.boxes.get("chat")!;
+          const b = nl.boxes.get(lb) ?? nl.boxes.get("think")!;
+          const hex = hotBack ? hotHex : lerpHex(theme.wireDim, theme.ok, 0.35);
+          const col = RGBA.fromHex(hex);
+          for (const c of wireLoop(a, b, channelY)) put(buffer, c.x, c.y, c.ch, col, width, height);
+        }
 
-        const trail = flow.main.trail;
-        for (let i = 0; i + 1 < trail.length; i++) {
-          const from = trail[i]!, to = trail[i + 1]!;
-          // hide the U-return when the tool stack uses that space, OR when its
-          // channel would reach the bottom region (bands/HUD) at short heights.
-          if (isReturn(from, to) && (expanded || channelY >= regionBottom)) continue;
-          const cells = wireFor(from, to, layout, channelY, railY);
-          if (cells.length === 0) continue;
-          const isComet = i === trail.length - 2 && animating;
-          const a = layout.get(from), b = layout.get(to);
-          const isRailFwd = !!a && !!b && a.y === b.y && b.x > a.x;
-          if (isRailFwd && !isComet) continue; // static rail already draws it — don't clobber the tees
-          const laneHex = laneHexOf(to);
-          if (isComet) {
-            const head = phase * cells.length;
-            cells.forEach((c, ci) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(cometColor(head - ci, TAIL, flow.main.errored ? theme.err : laneHex, theme.pulseHot, theme.wireDim, 0.2 + 0.3 * tempo)), width, height));
-          } else {
-            const baseI = 0.2 + 0.3 * ((i + 1) / Math.max(1, trail.length - 1));
-            cells.forEach((c) => put(buffer, c.x, c.y, c.ch, RGBA.fromHex(lerpHex(theme.wireDim, laneHex, baseI)), width, height));
+        // sub-row: dashed tree fan + circles
+        if (sr) {
+          const d = diamondCell(nl.boxes.get("tool")!);
+          const wireDimCol = RGBA.fromHex(theme.wireDim);
+          for (const c of sr.cells) put(buffer, c.x, c.y, c.ch, wireDimCol, width, height);
+          sr.circles.forEach((c, i) => drawSubNode(buffer, c, items[i]!, sr.labelY, now, animating, width, height));
+          put(buffer, d.x, d.y, "◇", RGBA.fromHex(theme.dim), width, height);
+          if (items.length > sr.shown && sr.circles.length > 0) {
+            const last = sr.circles[sr.circles.length - 1]!;
+            drawStr(buffer, last.x + last.w + 2, last.y + 1, `+${items.length - sr.shown} more`, RGBA.fromHex(theme.dim), width, height);
           }
         }
 
-        // dynamic drop arrow: the rail taps DOWN into the currently-active card
-        const activeK = flow.main.activeKind;
-        if (activeK && COARSE_STAGES.includes(activeK)) {
-          const r = layout.get(activeK)!;
-          const sx = r.x + (r.w >> 1);
-          const dropCol = RGBA.fromHex(flow.main.errored ? theme.err : (animating ? lerpHex(laneHexOf(activeK), theme.pulseHot, breathe(now)) : laneHexOf(activeK)));
-          put(buffer, sx, railY, "┯", dropCol, width, height);
-          for (let y = railY + 1; y < r.y - 1; y++) put(buffer, sx, y, "│", dropCol, width, height);
-          put(buffer, sx, r.y - 1, "▼", dropCol, width, height);
+        // node boxes
+        for (const k of row) {
+          const r = nl.boxes.get(k)!;
+          const active = k === activeK;
+          const laneHex = k === "prompt" ? theme.coral : laneHexOf(k);
+          const border = RGBA.fromHex(active ? (flow.main.errored ? theme.err : laneHex) : theme.dim);
+          const name = k;
+          const detail =
+            k === "prompt" ? `turn ${(flow.main.counts["chat"] ?? 0) + 1}`
+            : k === "result" ? `✓${flow.main.ok} ✗${flow.main.err}`
+            : active && flow.main.detail ? flow.main.detail
+            : `×${flow.main.counts[k] ?? 0}`;
+          drawNodeBox(buffer, r, mode, k, name, detail, border, laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
+          // ports (chat's dangling output stays — n8n shows the bare port circle)
+          if (k !== "prompt") put(buffer, portIn(r).x, portIn(r).y, "○", RGBA.fromHex(theme.dim), width, height);
+          put(buffer, portOut(r).x, portOut(r).y, "●", RGBA.fromHex(theme.dim), width, height);
+          // badge
+          const bc = badgeCell(r);
+          if (flow.main.errored && active) put(buffer, bc.x, bc.y, "✗", RGBA.fromHex(theme.err), width, height);
+          else if ((flow.main.counts[k] ?? 0) > 0) put(buffer, bc.x, bc.y, "✓", RGBA.fromHex(theme.ok), width, height);
+          // trigger bolt
+          if (k === "prompt") {
+            const b = boltCell(r);
+            put(buffer, b.x, b.y, "↯", RGBA.fromHex(theme.coral), width, height);
+          }
         }
 
-        for (const k of presentKinds) {
-          const r = layout.get(k)!;
-          const active = k === flow.main.activeKind;
-          const laneHex = laneHexOf(k);
-          const border = RGBA.fromHex(active ? (flow.main.errored ? theme.err : (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex)) : theme.dim);
-          const icon = iconFor(active ? (flow.main.actionIcon ?? STAGE_ICON[k] ?? "tool") : (STAGE_ICON[k] ?? "tool"));
-          const content = k === "result" ? `✓${flow.main.ok} ✗${flow.main.err}` : `×${flow.main.counts[k] ?? 0}`;
-          drawCard(buffer, r, icon, k, content, RGBA.fromHex(active ? theme.fg : theme.dim), border, active, width, height);
+        // orbiting ring on the active (or waiting) node — n8n: errors stop the ring
+        if (ringKey && animating && !flow.main.errored && status !== "error") {
+          drawRing(buffer, nl.boxes.get(ringKey)!, ringKey === "prompt", now, ringMs, width, height); // rounded: unreachable today, future-proof for a prompt-ring
+          const rr = nl.boxes.get(ringKey)!;
+          if (ringKey !== "prompt") put(buffer, portIn(rr).x, portIn(rr).y, "○", RGBA.fromHex(theme.dim), width, height);
+          put(buffer, portOut(rr).x, portOut(rr).y, "●", RGBA.fromHex(theme.dim), width, height);
+          if ((flow.main.counts[ringKey] ?? 0) > 0) put(buffer, badgeCell(rr).x, badgeCell(rr).y, "✓", RGBA.fromHex(theme.ok), width, height);
         }
 
-        // tool vertical expansion
-        if (toolN > 0) {
-          for (const c of pipeBranch(toolRect, toolChildRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-          toolChildKinds.forEach((k, i) => {
-            const r = toolChildRects[i]!;
-            const activeChild = k === flow.main.activeTool;
-            const laneHex = laneHexOf("tool");
-            const fg = RGBA.fromHex(activeChild ? (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : theme.fg) : theme.dim);
-            drawStr(buffer, r.x, r.y, clip(`${iconFor(k as IconKey)} ${k} ×${flow.main.toolBreakdown[k] ?? 0}`, width - r.x - 2), fg, width, height);
-          });
-          if (toolExtra > 0) drawStr(buffer, toolRect.x + 4, (toolChildRects[toolChildRects.length - 1]?.y ?? toolRect.y + toolRect.h) + 1, `+${toolExtra} more`, RGBA.fromHex(theme.dim), width, height);
+        // milestone burst (commit/branch) on the active box, as before
+        const ak2 = flow.main.activeKind;
+        if (flow.main.milestone && ak2 && nl.boxes.has(ak2) && !(flow.main.milestone === "commit" && flow.main.errored)) {
+          const r = nl.boxes.get(ak2)!;
+          drawBurst(buffer, r.x + (r.w >> 1), r.y, flow.main.milestone, pulsePhase(now, lastAdvanceMs, intervalMs), laneHexOf(ak2), width, height);
         }
 
-        // skill vertical expansion (#9)
-        if (showSkillCard && skillN > 0) {
-          for (const c of pipeBranch(skillRect, skillChildRects)) put(buffer, c.x, c.y, c.ch, RGBA.fromHex(theme.wireDim), width, height);
-          skillChildKinds.forEach((k, i) => {
-            const r = skillChildRects[i]!;
-            const activeChild = k === flow.main.activeSkill;
-            const laneHex = laneHexOf("skill");
-            const fg = RGBA.fromHex(activeChild ? (animating ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : theme.fg) : theme.dim);
-            drawStr(buffer, r.x, r.y, clip(`${iconFor("skill")} ${k} ×${flow.main.skillBreakdown[k] ?? 0}`, width - r.x - 2), fg, width, height);
-          });
-          if (skillExtra > 0) drawStr(buffer, skillRect.x + 4, (skillChildRects[skillChildRects.length - 1]?.y ?? skillRect.y + skillRect.h) + 1, `+${skillExtra} more`, RGBA.fromHex(theme.dim), width, height);
-        }
-
-        const ak = flow.main.activeKind;
-        if (flow.main.milestone && ak && layout.has(ak) && !(flow.main.milestone === "commit" && flow.main.errored)) {
-          const r = layout.get(ak)!;
-          drawBurst(buffer, r.x + (r.w >> 1), r.y, flow.main.milestone, phase, laneHexOf(ak), width, height);
-        }
-
-        const bottoms = [...layout.entries()].filter(([k]) => presentKinds.includes(k)).map(([, r]) => r.y + r.h);
-        const toolChildBottom = toolChildRects.length > 0 ? toolChildRects[toolChildRects.length - 1]!.y + 2 : 0;
-        const skillChildBottom = skillChildRects.length > 0 ? skillChildRects[skillChildRects.length - 1]!.y + 2 : 0;
-        let sy = Math.max(channelY + 1, toolChildBottom, skillChildBottom, ...bottoms) + 1;
-        if (flow.agentsLive > 0) {
-          drawStr(buffer, LEFT, sy, `▸ ${flow.agentsLive} agent${flow.agentsLive > 1 ? "s" : ""} live`, RGBA.fromHex(theme.accent), width, height);
-          sy += 1;
-          flow.subLanes.slice(0, 3).forEach((ln) => { drawSubLane(buffer, ln, sy, now, animating, width, height); sy += 1; });
-        }
+        // bottom bands + HUD (unchanged zones)
         let by = hudTop;
         if (showEconomy) { by -= 1; drawEconomy(buffer, LEFT, by, tokens, width, height); }
         if (showHeartbeat) { by -= 1; drawHeartbeat(buffer, LEFT, by, width - LEFT - 2, presented, cursor, height); }

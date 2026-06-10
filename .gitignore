@@ -7,3 +7,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# local research artifacts (screenshots etc.)
+.research/
+.playwright-mcp/
