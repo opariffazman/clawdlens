@@ -244,12 +244,15 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const activeK = flow.main.activeKind;
   const ringKey = status === "waiting" ? "chat" : activeK && nl.boxes.has(activeK) ? activeK : null;
   const ringMs = status === "waiting" ? RING_WAIT_MS : RING_MS;
+  // long thinks park the timeline (animate=false) but the model is still working —
+  // keep the think box breathing so the user sees life (n8n keeps its ring spinning).
+  const thinkPulse = (status === "working" || status === "running") && activeK === "think";
 
   return (
     <box
       style={{ width, height, backgroundColor: TRANSPARENT }}
       buffered
-      live={animate}
+      live={animate || thinkPulse}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();
@@ -311,7 +314,11 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const r = nl.boxes.get(k)!;
           const active = k === activeK;
           const laneHex = k === "prompt" ? theme.coral : laneHexOf(k);
-          const border = RGBA.fromHex(active ? (flow.main.errored ? theme.err : laneHex) : theme.dim);
+          const pulseThis = thinkPulse && !animating && k === "think";
+          const border = RGBA.fromHex(
+            pulseThis ? lerpHex(laneHex, theme.pulseHot, breathe(now))
+            : active ? (flow.main.errored ? theme.err : laneHex) : theme.dim,
+          );
           const detail =
             k === "prompt" ? `turn ${(flow.main.counts["chat"] ?? 0) + 1}`
             : k === "result" ? `✓${flow.main.ok} ✗${flow.main.err}`
@@ -319,7 +326,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
             : `×${flow.main.counts[k] ?? 0}`;
           const art = mode === "art" ? (nl.wide ? ICON_ART_13 : ICON_ART_7)[STAGE_ART[k] ?? "tool"] : null;
           const bigLabel = bigNames ? LABEL_ART[k as keyof typeof LABEL_ART] ?? null : null;
-          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, detail, border, laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
+          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, detail, border, pulseThis ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
           // ports (chat's dangling output stays — n8n shows the bare port circle)
           if (k !== "prompt") put(buffer, portIn(r).x, portIn(r).y, "○", RGBA.fromHex(theme.dim), width, height);
           put(buffer, portOut(r).x, portOut(r).y, "●", RGBA.fromHex(theme.dim), width, height);
