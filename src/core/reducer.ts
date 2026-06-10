@@ -22,6 +22,11 @@ function basename(p: string): string {
   return parts[parts.length - 1] || p;
 }
 
+function parentDirName(p: string): string {
+  const parts = p.split("/");
+  return parts.length >= 2 ? parts[parts.length - 2]! : "";
+}
+
 function iconKeyFor(name: string): IconKey {
   switch (name) {
     case "Bash": return "bash";
@@ -106,7 +111,7 @@ export function newSession(id: string, file: string): SessionState {
   return {
     id, file,
     title: id.slice(0, 8),
-    cwd: "", project: "", gitBranch: "", model: "",
+    cwd: "", project: "", projectDir: parentDirName(file), gitBranch: "", model: "",
     status: "idle",
     startedTs: 0, lastActivityTs: 0,
     tokens: newSessionTokens(),

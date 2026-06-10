@@ -1,7 +1,7 @@
 // cwd-scoped session focus: which session should ClawdLens show?
 // Pure — the invocation cwd is resolved (realpath) by the caller.
 
-export interface FocusSession { id: string; project: string; cwd: string; lastActivityTs: number }
+export interface FocusSession { id: string; projectDir: string; cwd: string; lastActivityTs: number }
 
 export interface FocusInput {
   sessions: FocusSession[];
@@ -21,14 +21,15 @@ export function projectKeyForCwd(cwd: string): string {
 // Exact project-dir match if any, else cwd-containment (sessions started in
 // subdirectories — monorepo roots). Exact-first keeps broad cwds (e.g. $HOME,
 // itself a project dir) from swallowing every session beneath them.
-export function projectSessionsFor<S extends { project: string; cwd: string }>(
+export function projectSessionsFor<S extends { projectDir: string; cwd: string }>(
   sessions: S[],
   invocationCwd: string,
 ): S[] {
   const key = projectKeyForCwd(invocationCwd);
-  const exact = sessions.filter((x) => x.project === key);
+  const exact = sessions.filter((x) => x.projectDir === key);
   if (exact.length > 0) return exact;
-  return sessions.filter((x) => x.cwd.startsWith(invocationCwd + "/"));
+  const prefix = invocationCwd === "/" ? "/" : invocationCwd + "/";
+  return sessions.filter((x) => x.cwd.startsWith(prefix));
 }
 
 export function resolveFocus(i: FocusInput): FocusDecision {
@@ -36,13 +37,21 @@ export function resolveFocus(i: FocusInput): FocusDecision {
   if (i.userPinned && exists) return { id: i.selectedId, reason: "keep" };
   const proj = projectSessionsFor(i.sessions, i.invocationCwd);
   if (proj.length > 0) {
-    const newest = proj.reduce((a, b) => (b.lastActivityTs > a.lastActivityTs ? b : a));
+    const newest = proj.reduce((a, b) =>
+      b.lastActivityTs !== a.lastActivityTs
+        ? (b.lastActivityTs > a.lastActivityTs ? b : a)
+        : (b.id > a.id ? b : a)
+    );
     if (newest.id === i.selectedId) return { id: newest.id, reason: "keep" };
     return { id: newest.id, reason: "project-follow" };
   }
   if (exists) return { id: i.selectedId, reason: "keep" };
   const newest = i.sessions.length
-    ? i.sessions.reduce((a, b) => (b.lastActivityTs > a.lastActivityTs ? b : a))
+    ? i.sessions.reduce((a, b) =>
+        b.lastActivityTs !== a.lastActivityTs
+          ? (b.lastActivityTs > a.lastActivityTs ? b : a)
+          : (b.id > a.id ? b : a)
+      )
     : null;
   return { id: newest ? newest.id : null, reason: "global-initial" };
 }

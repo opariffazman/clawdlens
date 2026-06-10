@@ -1,8 +1,8 @@
 import { test, expect } from "bun:test";
 import { projectKeyForCwd, projectSessionsFor, resolveFocus } from "../src/core/focus";
 
-function s(id: string, project: string, cwd: string, lastActivityTs: number) {
-  return { id, project, cwd, lastActivityTs };
+function s(id: string, projectDir: string, cwd: string, lastActivityTs: number) {
+  return { id, projectDir, cwd, lastActivityTs };
 }
 
 test("projectKeyForCwd encodes every non-alphanumeric as dash, preserves case", () => {
@@ -70,4 +70,18 @@ test("resolveFocus: outside any project — picks the globally newest ONCE, then
 test("resolveFocus: no sessions → null", () => {
   expect(resolveFocus({ sessions: [], invocationCwd: "/p", selectedId: null, userPinned: false }))
     .toEqual({ id: null, reason: "global-initial" });
+});
+
+test("resolveFocus: lastActivityTs tie breaks deterministically by id", () => {
+  const a = s("aaa", "-p", "/p", 50);
+  const b = s("zzz", "-p", "/p", 50);
+  const d1 = resolveFocus({ sessions: [a, b], invocationCwd: "/p", selectedId: null, userPinned: false });
+  const d2 = resolveFocus({ sessions: [b, a], invocationCwd: "/p", selectedId: null, userPinned: false });
+  expect(d1.id).toBe("zzz");
+  expect(d2.id).toBe("zzz"); // order-independent
+});
+
+test("projectSessionsFor: root invocation cwd matches by single-slash prefix", () => {
+  const x = s("x", "-tmp-x", "/tmp/x", 1);
+  expect(projectSessionsFor([x], "/")).toEqual([x]);
 });
