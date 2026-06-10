@@ -63,6 +63,8 @@ test("trace B regression: resume after a long pause advances paced, not in a bur
   p.play(); // 60s later
   p.tick(61_000); // first tick after resume re-bases the clock
   expect(p.cursor() - at).toBeLessThanOrEqual(1); // no time-debt burst
+  drain(p, 61_100, 61_600, 50);
+  expect(p.cursor()).toBeGreaterThan(at); // and playback actually resumed, paced
 });
 
 test("trace C regression: stepForward works while paused", () => {
@@ -127,7 +129,7 @@ test("loop wraps the cursor for screensaver replay", () => {
   const p = createPlayer({ baseIntervalMs: 100, minIntervalMs: 1, loop: true });
   p.setBeats([beat("1", "A"), beat("2", "B"), beat("3", "C")]);
   drain(p, 0, 1000, 100);
-  expect(p.cursor()).toBeLessThanOrEqual(3); // wrapped rather than stuck
+  expect(p.cursor()).toBeLessThan(3); // wrapped (cursor never rests at the end while looping)
 });
 
 test("setBeats clamps the cursor when the transcript shrinks", () => {

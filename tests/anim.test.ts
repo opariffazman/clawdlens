@@ -60,7 +60,6 @@ test("breathe stays within [0.6,1] and repeats by period", () => {
 test("shouldAnimate: only live + recently advanced", () => {
   // mode not playing → never animate
   expect(shouldAnimate("paused", 1000, 200, 1100)).toBe(false);
-  expect(shouldAnimate("paused", 1000, 200, 1100)).toBe(false);
   // playing, never advanced (lastAdvanceMs < 0) → false
   expect(shouldAnimate("playing", -1, 200, 5000)).toBe(false);
   // playing, bad interval → false

@@ -10,7 +10,7 @@ export function createPlayer(opts: PlayerOpts = {}) {
 
   let coalesced: Beat[] = [];
   let cursor = 0;                // the ONE position — view and playback head
-  let mode: PlayMode = "playing"; // "live" is derived: playing && backlog 0
+  let mode: PlayMode = "playing"; // "live" is derived: playing && cursor caught up to the tail
   let speed = 1;
   let lastAdvanceAt = -1;        // -1 → next tick re-bases (prevents time-debt bursts)
   let started = false;
@@ -26,7 +26,7 @@ export function createPlayer(opts: PlayerOpts = {}) {
       }
     }
     coalesced = out;
-    if (cursor > coalesced.length) cursor = coalesced.length;
+    if (cursor > coalesced.length) { cursor = coalesced.length; lastAdvanceAt = -1; }
   }
 
   function backlog(): number { return coalesced.length - cursor; }
@@ -47,9 +47,11 @@ export function createPlayer(opts: PlayerOpts = {}) {
     tick(now: number) {
       if (!started || mode !== "playing") return;
       if (lastAdvanceAt < 0) lastAdvanceAt = now;
-      while (cursor < coalesced.length && now - lastAdvanceAt >= interval()) {
+      while (cursor < coalesced.length) {
+        const iv = interval();
+        if (now - lastAdvanceAt < iv) break;
         cursor += 1;
-        lastAdvanceAt += interval();
+        lastAdvanceAt += iv;
       }
       if (loop && cursor >= coalesced.length && coalesced.length > 0) {
         cursor = 0; // screensaver wrap
