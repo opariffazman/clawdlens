@@ -18,6 +18,8 @@ export interface LaneFlow {
   activeTool: string | null;             // head tool's iconKey (for the expand highlight)
   skillBreakdown: Record<string, number>; // live skill counts keyed by skill name
   activeSkill: string | null;             // head skill beat's name (for the expand highlight)
+  hops: Record<string, number>;          // "think>tool" -> distinct-collapsed traversal count
+  lastHop: string | null;                // newest transition, e.g. "tool>result"
 }
 
 export interface FlowState {
@@ -62,11 +64,19 @@ function laneFlow(lane: string, label: string, beats: Beat[], isOpen: boolean, t
   const skillBreakdown: Record<string, number> = {};
   for (const b of beats) if (b.kind === "skill") { const n = b.skill ?? b.label; skillBreakdown[n] = (skillBreakdown[n] ?? 0) + 1; }
   const activeSkill = head?.kind === "skill" ? (head.skill ?? head.label) : null;
+  const seq: string[] = [];
+  for (const s of steps) if (seq.at(-1) !== s) seq.push(s);
+  const hops: Record<string, number> = {};
+  for (let i = 0; i + 1 < seq.length; i++) {
+    const k = `${seq[i]}>${seq[i + 1]}`;
+    hops[k] = (hops[k] ?? 0) + 1;
+  }
+  const lastHop = seq.length >= 2 ? `${seq[seq.length - 2]}>${seq[seq.length - 1]}` : null;
   return {
     lane, label, activeKind, trail,
     actionIcon: activeKind === "result" ? "result" : (head?.iconKey ?? null),
     detail: head?.detail ?? head?.label ?? null,
-    errored, milestone: head?.milestone ?? null, isOpen, counts, ok, err, toolBreakdown, activeTool, skillBreakdown, activeSkill,
+    errored, milestone: head?.milestone ?? null, isOpen, counts, ok, err, toolBreakdown, activeTool, skillBreakdown, activeSkill, hops, lastHop,
   };
 }
 
