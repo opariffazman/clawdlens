@@ -1,4 +1,4 @@
-import { RGBA, type OptimizedBuffer } from "@opentui/core";
+import { RGBA, renderFontToFrameBuffer, measureText, type OptimizedBuffer } from "@opentui/core";
 import { deriveFlow } from "../../core/pipeline-flow";
 import {
   nodeLayout, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell,
@@ -135,17 +135,25 @@ function drawHud(buf: OptimizedBuffer, flow: ReturnType<typeof deriveFlow>, stat
   put(buf, w - 2, top, "┐", border, w, h);
   put(buf, w - 2, top + bandH - 1, "┘", border, w, h);
   for (let y = top + 1; y < top + bandH - 1; y++) { put(buf, LEFT, y, "│", border, w, h); put(buf, w - 2, y, "│", border, w, h); }
-  drawStr(buf, LEFT + 2, top, " NOW ", RGBA.fromHex(theme.accent), w, h);
+  const nowM = measureText({ text: "NOW", font: "tiny" }); // ~14x2
+  const bigNow = w >= 80;
+  let tx = LEFT + 2;
+  if (bigNow) {
+    renderFontToFrameBuffer(buf, { text: "NOW", x: tx, y: top + 1, color: RGBA.fromHex(theme.accent), font: "tiny" });
+    tx += nowM.width + 2;
+  } else {
+    drawStr(buf, LEFT + 2, top, " NOW ", RGBA.fromHex(theme.accent), w, h);
+  }
   const m = flow.main;
   const nowLine = m.activeKind
     ? `${iconFor(m.actionIcon ?? STAGE_GLYPH[m.activeKind] ?? "tool")} ${m.activeKind}${m.detail ? " · " + m.detail : ""}`
     : "idle";
-  drawStr(buf, LEFT + 2, top + 1, clip(nowLine, w - 6), RGBA.fromHex(m.errored ? theme.err : theme.fg), w, h);
+  drawStr(buf, tx, top + 1, clip(nowLine, w - tx - 4), RGBA.fromHex(m.errored ? theme.err : theme.fg), w, h);
   const succTotal = m.ok + m.err;
   const succ = succTotal > 0 ? Math.round((100 * m.ok) / succTotal) : 100;
   const bars = Math.max(0, Math.min(4, Math.round(tempo * 4)));
   const tempoBar = "▮".repeat(bars) + "▯".repeat(4 - bars);
-  let cx = LEFT + 2;
+  let cx = tx;
   put(buf, cx, top + 2, "●", RGBA.fromHex(statusHex(status)), w, h); cx += 2;
   const rest = `${status}   tempo ${tempoBar}   ✓${succ}% ${m.ok}/${m.err}   ${flow.agentsLive} agent${flow.agentsLive === 1 ? "" : "s"}   beats ${cursor}/${total}`;
   drawStr(buf, cx, top + 2, clip(rest, w - cx - 3), RGBA.fromHex(theme.dim), w, h);
