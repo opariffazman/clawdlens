@@ -183,7 +183,8 @@ export function nodeLayout(width: number, top: number, mode: BoxMode): NodeLayou
   const row = showTrigger ? [...ROW_FULL] : ROW_FULL.slice(1);
   const boxW = showTrigger || width >= rowNeed(4, BOX_W, GAP_MIN) ? BOX_W : BOX_W_NARROW;
   const n = row.length;
-  const gap = Math.max(GAP_SQUEEZE, Math.floor((width - LEFT - 2 - n * boxW) / (n - 1)));
+  const eff = Math.max(width, rowNeed(n, boxW, GAP_SQUEEZE)); // floor: row may overflow tiny widths; panel clips
+  const gap = Math.max(GAP_SQUEEZE, Math.floor((eff - LEFT - 2 - n * boxW) / (n - 1)));
   const boxes = new Map<string, Rect>();
   row.forEach((k, i) => boxes.set(k, { x: LEFT + i * (boxW + gap), y: top, w: boxW, h: boxH }));
   return { boxes, row, mode, boxW, boxH, showTrigger, showLabels };

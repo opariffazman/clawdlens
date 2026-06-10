@@ -166,6 +166,9 @@ test("nodeLayout width ladder: labels drop, then trigger drops, then boxes narro
   expect(noTrig.row).toEqual(["think", "tool", "result", "chat"]);
   expect(noTrig.boxW).toBe(BOX_W);
   expect(nodeLayout(60, TOP, "art").boxW).toBe(BOX_W_NARROW);
+  expect(nodeLayout(105, TOP, "art").showLabels).toBe(true);   // exact label threshold
+  expect(nodeLayout(71, TOP, "art").boxW).toBe(BOX_W);         // exact narrow threshold
+  expect(nodeLayout(70, TOP, "art").boxW).toBe(BOX_W_NARROW);
 });
 
 test("nodeLayout glyph mode uses the short box height", () => {
