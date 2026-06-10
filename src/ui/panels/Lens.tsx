@@ -139,7 +139,7 @@ function drawHud(buf: OptimizedBuffer, flow: ReturnType<typeof deriveFlow>, stat
   const bigNow = w >= 80;
   let tx = LEFT + 2;
   if (bigNow) {
-    renderFontToFrameBuffer(buf, { text: "NOW", x: tx, y: top + 1, color: RGBA.fromHex(theme.accent), font: "tiny" });
+    renderFontToFrameBuffer(buf, { text: "NOW", x: tx, y: top + 1, color: RGBA.fromHex(theme.accent), font: "tiny", backgroundColor: TRANSPARENT });
     tx += nowM.width + 2;
   } else {
     drawStr(buf, LEFT + 2, top, " NOW ", RGBA.fromHex(theme.accent), w, h);
@@ -267,6 +267,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           renderFontToFrameBuffer(buffer, {
             text: t, x: sx, y: sy, font,
             color: useSlick ? [RGBA.fromHex(theme.coral), RGBA.fromHex(theme.dim)] : RGBA.fromHex(theme.coral),
+            backgroundColor: TRANSPARENT,
           });
           const hint = "waiting for session activity · : sessions";
           drawStr(buffer, Math.max(LEFT, (width - hint.length) >> 1), sy + fm.height + 1, hint, RGBA.fromHex(theme.dim), width, height);
@@ -315,8 +316,9 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const active = k === activeK;
           const laneHex = k === "prompt" ? theme.coral : laneHexOf(k);
           const pulseThis = thinkPulse && !animating && k === "think";
+          const pulseHex = pulseThis ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex;
           const border = RGBA.fromHex(
-            pulseThis ? lerpHex(laneHex, theme.pulseHot, breathe(now))
+            pulseThis ? pulseHex
             : active ? (flow.main.errored ? theme.err : laneHex) : theme.dim,
           );
           const detail =
@@ -326,7 +328,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
             : `×${flow.main.counts[k] ?? 0}`;
           const art = mode === "art" ? (nl.wide ? ICON_ART_13 : ICON_ART_7)[STAGE_ART[k] ?? "tool"] : null;
           const bigLabel = bigNames ? LABEL_ART[k as keyof typeof LABEL_ART] ?? null : null;
-          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, detail, border, pulseThis ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
+          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, detail, border, pulseHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
           // ports (chat's dangling output stays — n8n shows the bare port circle)
           if (k !== "prompt") put(buffer, portIn(r).x, portIn(r).y, "○", RGBA.fromHex(theme.dim), width, height);
           put(buffer, portOut(r).x, portOut(r).y, "●", RGBA.fromHex(theme.dim), width, height);
