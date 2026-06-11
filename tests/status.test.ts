@@ -24,3 +24,15 @@ test("idle when stale", () => {
 test("dormant when very stale (even if end_turn)", () => {
   expect(deriveStatus({ ...base, lastStopReason: "end_turn", ageMs: 40 * 60_000 })).toBe("dormant");
 });
+test("done after 30s quiet following end_turn", () => {
+  expect(deriveStatus({ ...base, lastStopReason: "end_turn", ageMs: 31_000 })).toBe("done");
+});
+test("still waiting just after end_turn", () => {
+  expect(deriveStatus({ ...base, lastStopReason: "end_turn", ageMs: 29_000 })).toBe("waiting");
+});
+test("mid-run stall without end_turn never reads done", () => {
+  expect(deriveStatus({ ...base, ageMs: 31_000 })).toBe("working"); // existing fallthrough path
+});
+test("done yields to dormant when very stale", () => {
+  expect(deriveStatus({ ...base, lastStopReason: "end_turn", ageMs: 31 * 60_000 })).toBe("dormant");
+});

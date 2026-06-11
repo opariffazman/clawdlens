@@ -7,6 +7,7 @@ export function statusGlyph(s: Status): { glyph: string; color: string; pulse: b
     case "working": return { glyph: "◐", color: theme.accent, pulse: false };
     case "waiting": return { glyph: "◑", color: theme.warn, pulse: true };
     case "error":   return { glyph: "✖", color: theme.err, pulse: true };
+    case "done":    return { glyph: "✓", color: theme.ok, pulse: false };
     case "dormant": return { glyph: "·", color: theme.dim, pulse: false };
     default:        return { glyph: "○", color: theme.dim, pulse: false };
   }

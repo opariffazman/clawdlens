@@ -27,7 +27,7 @@ src/core/   (pure, TDD)
   types.ts         all shared types (Entry, SessionState, Beat, Commit, IconKey, TodoItem…)
   parse.ts         JSONL line → Entry|null
   tokens.ts        context limit + cost estimate; effectiveContextLimit infers 1M when ctx>200k
-  status.ts        deriveStatus heuristic (running/working/waiting/idle/dormant/error)
+  status.ts        deriveStatus heuristic (running/working/waiting/done/idle/dormant/error)
   reducer.ts       applyEntry folds entry → SessionState (beats, fileHeat, todos, tasks, subagent lanes, iconKey). returns shallow copy — replace collections immutably
   lens.ts          superpowers phase detector (Brainstorm→Spec→Plan→Execute→Review→Ship)
   flow-layout.ts   beats → FlowGraph (lanes/nodes/segments, ROW_STRIDE). git-graph reuses shape

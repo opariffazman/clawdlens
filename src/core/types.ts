@@ -46,7 +46,7 @@ export interface Entry {
 }
 
 // Derived domain types
-export type Status = "running" | "working" | "waiting" | "idle" | "dormant" | "error";
+export type Status = "running" | "working" | "waiting" | "done" | "idle" | "dormant" | "error";
 
 export type BeatKind = "thinking" | "text" | "tool" | "skill" | "result" | "wait" | "phase";
 
