@@ -311,7 +311,7 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
           for (const c of wireForward(a, b, lbl)) put(buffer, c.x, c.y, c.ch, col, width, height);
         }
 
-        // backward loop (rounded U below the row)
+        // backward loop (rounded U above the row)
         if (loopOn) {
           const [la, lb] = hotBack ?? ["chat", "think"];
           const a = nl.boxes.get(la) ?? nl.boxes.get("chat")!;
