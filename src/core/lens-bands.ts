@@ -8,6 +8,7 @@ export interface LensTimeline {
   skills: Span[];
   agents: Span[];
   milestones: { ts: number; kind: "commit" | "branch" }[];
+  errors: { ts: number }[];
 }
 
 // map a timestamp to an x column within [0, width-1] over the range; safe when
@@ -57,8 +58,9 @@ export function lensTimeline(beats: Beat[], cursor: number): LensTimeline {
   const agents: Span[] = [...agentByLane.entries()].map(([key, a]) => ({ key, label: a.label, startTs: a.startTs, endTs: a.endTs }));
 
   const milestones = beats.filter((b) => b.milestone).map((b) => ({ ts: b.ts, kind: b.milestone! }));
+  const errors = beats.filter((b) => b.ok === false).map((b) => ({ ts: b.ts }));
 
-  return { range, skills, agents, milestones };
+  return { range, skills, agents, milestones, errors };
 }
 
 export interface HeartBucket { count: number; kind: string }

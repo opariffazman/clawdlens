@@ -24,11 +24,15 @@ export function drawSkillTimeline(buf: OptimizedBuffer, x: number, y: number, w:
   const tl = lensTimeline(beats, cursor);
   drawLane(buf, x, y, w, "skills", tl.skills, tl.range, (s) => s.label, h);
   drawLane(buf, x, y + 1, w, "agents", tl.agents, tl.range, () => "task", h);
-  // axis row: playhead + milestone ticks
+  // axis row: playhead + error/milestone ticks (milestones drawn last — rarer signal wins the cell)
   const trackX = x + LABEL_W;
   const trackW = Math.max(1, w - LABEL_W - 1);
   const ay = y + 2;
   for (let cx = trackX; cx < trackX + trackW; cx++) put(buf, cx, ay, "─", RGBA.fromHex(theme.wireDim), w, h);
+  for (const er of tl.errors) {
+    if (er.ts > tl.range.cursorTs) continue;
+    put(buf, trackX + tsToX(er.ts, tl.range, trackW), ay, "✖", RGBA.fromHex(theme.err), w, h);
+  }
   for (const m of tl.milestones) {
     if (m.ts > tl.range.cursorTs) continue;
     put(buf, trackX + tsToX(m.ts, tl.range, trackW), ay, "◆", RGBA.fromHex(theme.warn), w, h);

@@ -69,7 +69,7 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 
 ## Keys
 
-`:` command palette (fuzzy; sessions via `:`→sessions, then `/` to filter) · `Tab`/`Shift-Tab` panels · `↑`/`↓` scrub (auto-pauses) · `←`/`→` speed · `space` play/pause from cursor (paced catch-up, never bursts) · `r` replay from 0 · `l` jump to live · `i` lens detail · `?` help · `q` quit. Energy-pulse auto-runs while the timeline moves; `q` restores the terminal cleanly (no Ctrl+C).
+`:` command palette (fuzzy; sessions via `:`→sessions, then `/` to filter) · `Tab`/`Shift-Tab` panels · `↑`/`↓` scrub (auto-pauses) · `←`/`→` speed · `space` play/pause from cursor (paced catch-up, never bursts) · `r` replay from 0 · `l` jump to live · `e`/`E` jump next/prev error · `i` lens detail · `?` help · `q` quit. Energy-pulse auto-runs while the timeline moves; `q` restores the terminal cleanly (no Ctrl+C).
 
 ## Conventions
 

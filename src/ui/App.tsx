@@ -135,6 +135,8 @@ export function App({ store, cwd }: { store: Store; cwd: string }) {
       case "play.pause": player?.toggle(); break;
       case "play.replay": player?.replay(); break;
       case "play.live": player?.toLive(); break;
+      case "errors.next": player?.jumpError(1); break;
+      case "errors.prev": player?.jumpError(-1); break;
       case "files.sort": setFilesSort((s) => (s === "edits" ? "reads" : s === "reads" ? "recent" : "edits")); break;
       case "git.scope": setGitScope((s) => (s === "all" ? "branch" : "all")); break;
       case "tasks.hideDone": setTasksHideDone((v) => !v); break;
@@ -208,6 +210,8 @@ export function App({ store, cwd }: { store: Store; cwd: string }) {
       case "help": setShowHelp((h) => !h); break;
       case "replay": player?.replay(); break;
       case "live": player?.toLive(); break;
+      case "error-next": player?.jumpError(1); break;
+      case "error-prev": player?.jumpError(-1); break;
     }
   });
 

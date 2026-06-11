@@ -21,6 +21,8 @@ export const COMMANDS: Command[] = [
   { id: "play.pause", title: "Pause / Play", aliases: ["pause", "play"] },
   { id: "play.replay", title: "Replay", aliases: ["replay"] },
   { id: "play.live", title: "Go Live", aliases: ["live"] },
+  { id: "errors.next", title: "Next Error", aliases: ["error", "errors"] },
+  { id: "errors.prev", title: "Prev Error", aliases: ["error-prev"] },
   { id: "files.sort", title: "Sort: edits / reads / recent", aliases: ["sort"], context: (p) => p === "files" },
   { id: "git.scope", title: "Scope: all / branch", aliases: ["scope"], context: (p) => p === "git" },
   { id: "tasks.hideDone", title: "Toggle hide-completed", aliases: ["hide-done", "hide"], context: (p) => p === "tasks" },

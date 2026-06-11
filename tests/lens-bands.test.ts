@@ -105,3 +105,8 @@ test("ctxBreakdownView: residual system pool, clamped at 0, ordered", () => {
   const over = ctxBreakdownView({ ...newSessionTokens(), contextTokens: 100 }, { user: 80, tools: 80, subagents: 0, reasoning: 0 });
   expect(over.segments[0]!.tokens).toBe(0); // estimates exceed total → residual clamps
 });
+
+test("lensTimeline surfaces error beat timestamps", () => {
+  const beats = [beat({ id: "a", ts: 100 }), beat({ id: "b", ts: 200, ok: false }), beat({ id: "c", ts: 300 })];
+  expect(lensTimeline(beats, 3).errors).toEqual([{ ts: 200 }]);
+});

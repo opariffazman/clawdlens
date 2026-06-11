@@ -3,6 +3,7 @@ export type Action =
   | { type: "beat-back" } | { type: "beat-fwd" }
   | { type: "speed-up" } | { type: "speed-down" }
   | { type: "pause" } | { type: "replay" } | { type: "live" }
+  | { type: "error-next" } | { type: "error-prev" }
   | { type: "info" } | { type: "help" } | { type: "quit" };
 
 export interface KeyEvent { name: string; shift?: boolean; ctrl?: boolean }
@@ -17,6 +18,7 @@ export function mapKey(key: KeyEvent): Action | null {
   if (n === "space") return { type: "pause" };
   if (n === "r") return { type: "replay" };
   if (n === "l") return { type: "live" };
+  if (n === "e") return key.shift ? { type: "error-prev" } : { type: "error-next" };
   if (n === "i") return { type: "info" };
   if (n === "?") return { type: "help" };
   if (n === "q") return { type: "quit" };

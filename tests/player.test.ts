@@ -175,3 +175,46 @@ test("intervalMs shrinks as backlog grows (adaptive cadence)", () => {
   many.setBeats(beats(5));
   expect(many.intervalMs()).toBeLessThan(few.intervalMs());
 });
+
+test("an error beat breaks coalescing — stays a singular node", () => {
+  const p = createPlayer();
+  p.setBeats([beat("1"), { ...beat("2"), ok: false }, beat("3")]);
+  drain(p, 0, 10_000, 200);
+  expect(p.all().length).toBe(3); // would be 1 without the error split
+  expect(p.all()[1]!.ok).toBe(false);
+});
+
+test("jumpError lands the cursor on the next/prev error and pauses", () => {
+  const p = createPlayer();
+  p.setBeats([beat("0", "L0"), { ...beat("1", "L1"), ok: false }, beat("2", "L2"), { ...beat("3", "L3"), ok: false }, beat("4", "L4")]);
+  p.replay(); p.tick(0); // cursor 0
+  expect(p.jumpError(1)).toBe(true);
+  expect(p.cursor()).toBe(2); // error at index 1 revealed at head
+  expect(p.mode()).toBe("paused");
+  expect(p.jumpError(1)).toBe(true);
+  expect(p.cursor()).toBe(4);
+  expect(p.jumpError(1)).toBe(false); // no wrap
+  expect(p.cursor()).toBe(4);
+  expect(p.jumpError(-1)).toBe(true);
+  expect(p.cursor()).toBe(2);
+  expect(p.jumpError(-1)).toBe(false); // none before
+});
+
+test("a later ok=false flip re-splits an already-coalesced run (live pairing path)", () => {
+  const p = createPlayer();
+  p.setBeats([beat("1"), beat("2"), beat("3")]);
+  drain(p, 0, 2_000, 200);
+  p.stepBack(); // user scrubbed + paused mid-run
+  const before = p.cursor();
+  p.setBeats([beat("1"), { ...beat("2"), ok: false }, beat("3")]); // tool_result pairs late → reducer flips ok
+  expect(p.all().length).toBe(3); // run re-split, error surfaced
+  expect(p.cursor()).toBe(before); // cursor position survives the re-split
+});
+
+test("jumpError indexes coalesced nodes, not raw beats", () => {
+  const p = createPlayer();
+  p.setBeats([beat("1", "A"), beat("2", "A"), { ...beat("3", "A"), ok: false }, beat("4", "B")]);
+  p.replay(); p.tick(0); // cursor 0; coalesced: [A×2, A(err), B]
+  expect(p.jumpError(1)).toBe(true);
+  expect(p.cursor()).toBe(2); // coalesced index 1 + 1, NOT raw index 2 + 1
+});

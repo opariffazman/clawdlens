@@ -69,7 +69,7 @@ export function Flow({ beats, cursor, animate, lastAdvanceMs, intervalMs, width,
           if (!b) continue;
           const focused = node.row === cursor - 1;
           const labelColor = RGBA.fromHex(
-            b.kind === "skill" ? theme.accent : focused ? theme.fg : b.ok === false ? theme.err : theme.fg,
+            b.ok === false ? theme.err : b.kind === "skill" ? theme.accent : theme.fg,
           );
           const laneHex = theme.laneColors[node.column % theme.laneColors.length]!;
           const iconColor = RGBA.fromHex(
@@ -77,7 +77,7 @@ export function Flow({ beats, cursor, animate, lastAdvanceMs, intervalMs, width,
           );
           const x = ICON_COL - 2 + node.column * 2;
           if (x < 0 || x >= width) continue;
-          buffer.setCell(x, y, focused ? "◉" : "○", iconColor, bg);
+          buffer.setCell(x, y, b.ok === false ? "✗" : focused ? "◉" : "○", b.ok === false ? RGBA.fromHex(theme.err) : iconColor, bg);
           const text = ` ${iconFor(b.iconKey)} ${b.label}${b.count > 1 ? ` ×${b.count}` : ""}${
             b.detail ? " · " + b.detail : ""
           }`;
