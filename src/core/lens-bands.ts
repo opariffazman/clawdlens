@@ -1,4 +1,4 @@
-import type { Beat, SessionTokens, ToolTiming } from "./types";
+import type { Beat, SessionTokens, ToolTiming, CtxPools } from "./types";
 import { detectLensFromBeats } from "./lens";
 
 export interface Span { key: string; label: string; startTs: number; endTs: number }
@@ -100,7 +100,7 @@ export function toolTimingView(timings: Record<string, ToolTiming>): ToolTimingR
 
 export interface EconomyView { inTok: string; outTok: string; cachePct: number; web: number }
 
-function kfmt(n: number): string { return n >= 1000 ? Math.round(n / 1000) + "k" : String(n); }
+export function kfmt(n: number): string { return n >= 1000 ? Math.round(n / 1000) + "k" : String(n); }
 
 export function economyView(t: SessionTokens): EconomyView {
   const denom = t.cacheRead + t.cacheCreate + t.input;
@@ -110,4 +110,22 @@ export function economyView(t: SessionTokens): EconomyView {
     cachePct: denom > 0 ? Math.round((t.cacheRead / denom) * 100) : 0,
     web: t.webCalls,
   };
+}
+
+export interface CtxSegment { key: string; label: string; tokens: number; frac: number }
+export interface CtxBreakdownView { total: number; segments: CtxSegment[] }
+
+// composition of what's IN context (vs contextTokens, not the model limit);
+// system prompt/tool defs/memory aren't in the transcript → residual, clamped ≥ 0.
+export function ctxBreakdownView(t: SessionTokens, p: CtxPools): CtxBreakdownView {
+  const total = t.contextTokens;
+  const sys = Math.max(0, total - (p.user + p.tools + p.subagents + p.reasoning));
+  const segs = [
+    { key: "system", label: "sys", tokens: sys },
+    { key: "user", label: "usr", tokens: p.user },
+    { key: "tools", label: "tool", tokens: p.tools },
+    { key: "subagents", label: "sub", tokens: p.subagents },
+    { key: "reasoning", label: "think", tokens: p.reasoning },
+  ];
+  return { total, segments: segs.map((s) => ({ ...s, frac: total > 0 ? s.tokens / total : 0 })) };
 }

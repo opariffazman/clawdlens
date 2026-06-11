@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { tsToX, lensTimeline, heartbeatBuckets, economyView, toolTimingView } from "../src/core/lens-bands";
+import { tsToX, lensTimeline, heartbeatBuckets, economyView, toolTimingView, ctxBreakdownView } from "../src/core/lens-bands";
 import type { Beat } from "../src/core/types";
 import { newSessionTokens } from "../src/core/types";
 
@@ -94,4 +94,14 @@ test("toolTimingView sorts bottleneck-first and derives avg", () => {
   });
   expect(rows.map((r) => r.name)).toEqual(["Bash", "Read"]);
   expect(rows[0]).toEqual({ name: "Bash", count: 2, avgMs: 4500, minMs: 1000, maxMs: 8000, totalMs: 9000 });
+});
+
+test("ctxBreakdownView: residual system pool, clamped at 0, ordered", () => {
+  const tokens = { ...newSessionTokens(), contextTokens: 200 };
+  const v = ctxBreakdownView(tokens, { user: 20, tools: 100, subagents: 30, reasoning: 10 });
+  expect(v.total).toBe(200);
+  expect(v.segments.map((s) => s.key)).toEqual(["system", "user", "tools", "subagents", "reasoning"]);
+  expect(v.segments[0]).toEqual({ key: "system", label: "sys", tokens: 40, frac: 0.2 }); // 200-160 residual
+  const over = ctxBreakdownView({ ...newSessionTokens(), contextTokens: 100 }, { user: 80, tools: 80, subagents: 0, reasoning: 0 });
+  expect(over.segments[0]!.tokens).toBe(0); // estimates exceed total → residual clamps
 });
