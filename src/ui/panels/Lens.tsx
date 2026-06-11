@@ -16,6 +16,7 @@ import { ICON_ART_7, ICON_ART_13, LABEL_ART, LABEL_H, type ArtKey } from "./lens
 import { detectLensFromBeats } from "../../core/lens";
 import { drawPhaseRibbon } from "./lens/phaseRibbon";
 import { drawEconomy } from "./lens/economy";
+import { drawCtxBand } from "./lens/ctxBand";
 import { drawHeartbeat } from "./lens/heartbeat";
 import { drawSkillTimeline } from "./lens/skillTimeline";
 import { toolTimingView } from "../../core/lens-bands";
@@ -32,6 +33,7 @@ interface Props {
   status: Status;
   infoOn: boolean;
   tokens: import("../../core/types").SessionTokens;
+  ctxPools: import("../../core/types").CtxPools;
   toolTimings: Record<string, import("../../core/types").ToolTiming>;
   width: number;
   height: number;
@@ -163,7 +165,7 @@ function drawHud(buf: OptimizedBuffer, flow: ReturnType<typeof deriveFlow>, stat
   drawStr(buf, cx, top + 2, clip(rest, w - cx - 3), RGBA.fromHex(theme.dim), w, h);
 }
 
-export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, tokens, toolTimings, width, height }: Props) {
+export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, tokens, ctxPools, toolTimings, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const lensState = detectLensFromBeats(presented.slice(0, cursor));
   const ribbonOn = lensState.lensId === "superpowers";
@@ -196,7 +198,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const bandH = 4;
   const hudTop = height - bandH;
   const hasTimeline = lensState.skillGroups.length > 0 || presented.slice(0, cursor).some((b) => b.iconKey === "task");
-  let ribbon = ribbonOn ? 2 : 0, econ = 1, heart = 1, time = hasTimeline ? 3 : 0;
+  let ribbon = ribbonOn ? 2 : 0, econ = 1, ctxB = 1, heart = 1, time = hasTimeline ? 3 : 0;
   let mode: BoxMode = "art";
   let bigNames = true; // miniwi node names; falls back to 1-row plain under pressure
   let sub = items.length > 0 ? SUB_ROWS : 0;
@@ -208,17 +210,18 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
     if (bigNames) bigNames = false;
     else if (mode === "art") mode = "glyph";
     else if (econ) econ = 0;
+    else if (ctxB) ctxB = 0;
     else if (heart) heart = 0;
     else if (time) time = 0;
     else if (ribbon) ribbon = 0;
     else if (sub) sub = 0;
     else break;
   }
-  const showRibbon = ribbon > 0, showEconomy = econ > 0, showHeartbeat = heart > 0, showTimeline = time > 0;
+  const showRibbon = ribbon > 0, showEconomy = econ > 0, showCtx = ctxB > 0, showHeartbeat = heart > 0, showTimeline = time > 0;
   const showSub = sub > 0;
 
   const regionTop = TOP + ribbon;
-  const regionBottom = hudTop - (econ + heart + time);
+  const regionBottom = hudTop - (econ + ctxB + heart + time);
   const boxH = mode === "art" ? BOX_H_ART : BOX_H_GLYPH;
   const blockH = boxH + Math.max(showSub ? SUB_ROWS : 0, (bigNames ? LABEL_H : 1) + 1);
   const top = Math.max(regionTop, regionTop + ((regionBottom - regionTop - blockH) >> 1));
@@ -379,6 +382,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         // bottom bands + HUD (unchanged zones)
         let by = hudTop;
         if (showEconomy) { by -= 1; drawEconomy(buffer, LEFT, by, tokens, width, height); }
+        if (showCtx) { by -= 1; drawCtxBand(buffer, LEFT, by, tokens, ctxPools, width, height); }
         if (showHeartbeat) { by -= 1; drawHeartbeat(buffer, LEFT, by, width - LEFT - 2, presented, cursor, height); }
         if (showTimeline) { by -= 3; drawSkillTimeline(buffer, LEFT, by, width - LEFT - 2, presented, cursor, height); }
         drawHud(buffer, flow, status, tempo, total, cursor, width, height);
