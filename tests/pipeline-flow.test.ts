@@ -167,3 +167,23 @@ test("hops empty and lastHop null with fewer than two distinct steps", () => {
   expect(f.main.hops).toEqual({});
   expect(f.main.lastHop).toBeNull();
 });
+
+test("activeToolName = head tool's label while a tool is the head", () => {
+  const f = deriveFlow([beat({ kind: "tool", label: "Bash" })], 1, 3);
+  expect(f.main.activeToolName).toBe("Bash");
+});
+
+test("activeToolName = head tool's label even when the tool is completed (ok defined)", () => {
+  const f = deriveFlow([beat({ kind: "tool", label: "Bash", ok: true })], 1, 3);
+  expect(f.main.activeToolName).toBe("Bash");
+});
+
+test("activeToolName is null when the head is not a tool", () => {
+  const f = deriveFlow([beat({ kind: "tool", label: "Bash" }), beat({ kind: "thinking" })], 2, 3);
+  expect(f.main.activeToolName).toBeNull();
+});
+
+test("activeToolName is null with no revealed beats", () => {
+  const f = deriveFlow([], 0, 3);
+  expect(f.main.activeToolName).toBeNull();
+});

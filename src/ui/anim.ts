@@ -57,6 +57,7 @@ export function breathe(now: number, periodMs = 1800): number {
 }
 
 import type { PlayMode } from "../core/player";
+import type { Status } from "../core/types";
 
 // Whether the buffered panels should run their continuous animation loop.
 // True only while playing AND advanced within the last ~2 intervals;
@@ -65,4 +66,16 @@ export function shouldAnimate(mode: PlayMode, lastAdvanceMs: number, intervalMs:
   if (mode !== "playing") return false;
   if (lastAdvanceMs < 0 || intervalMs <= 0) return false;
   return now - lastAdvanceMs < intervalMs * 2;
+}
+
+// Whether the active node's orbiting ring should spin, independent of the timeline
+// player. `busy` = the real session is actively doing work (working/running) on
+// live — used to surface the running tool. `live` = player playing AND caught up.
+// Errors stop the ring. Waiting spins too (a gentle "ready for you"); the slower
+// period is chosen at the call site via RING_WAIT_MS, so it is not returned here.
+export function ringSpin(status: Status, live: boolean, animating: boolean): { spin: boolean; busy: boolean } {
+  if (status === "error") return { spin: false, busy: false };
+  const busy = live && (status === "working" || status === "running");
+  const wait = live && status === "waiting";
+  return { spin: animating || busy || wait, busy };
 }

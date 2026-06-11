@@ -16,6 +16,7 @@ export interface LaneFlow {
   err: number;                           // completed-tool failures (live)
   toolBreakdown: Record<string, number>; // live tool counts keyed by iconKey
   activeTool: string | null;             // head tool's iconKey (for the expand highlight)
+  activeToolName: string | null;         // head tool's human name (e.g. "Bash") for the live sub-node
   skillBreakdown: Record<string, number>; // live skill counts keyed by skill name
   activeSkill: string | null;             // head skill beat's name (for the expand highlight)
   hops: Record<string, number>;          // "think>tool" -> distinct-collapsed traversal count
@@ -75,7 +76,7 @@ function laneFlow(lane: string, label: string, beats: Beat[], isOpen: boolean, t
     lane, label, activeKind, trail,
     actionIcon: activeKind === "result" ? "result" : (head?.iconKey ?? null),
     detail: head?.detail ?? head?.label ?? null,
-    errored, milestone: head?.milestone ?? null, isOpen, counts, ok, err, toolBreakdown, activeTool, skillBreakdown, activeSkill, hops, lastHop,
+    errored, milestone: head?.milestone ?? null, isOpen, counts, ok, err, toolBreakdown, activeTool, activeToolName: head?.kind === "tool" ? head.label : null, skillBreakdown, activeSkill, hops, lastHop,
   };
 }
 

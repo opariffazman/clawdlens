@@ -24,6 +24,7 @@ interface Props {
   lastAdvanceMs: number;     // player cadence for the animation
   intervalMs: number;        // player cadence for the animation
   animate: boolean;
+  live: boolean;             // player playing + caught up → keep the active ring alive
   marker: string;
   width: number;
   height: number;
@@ -39,7 +40,7 @@ interface Props {
   focusLocked?: boolean;     // invocation cwd matched session(s) → ⌂ in the header
 }
 
-export function Showcase({ session, panel, presented, cursor, playerTotal, infoOn, lastAdvanceMs, intervalMs, animate, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost, reveal, focusLocked }: Props) {
+export function Showcase({ session, panel, presented, cursor, playerTotal, infoOn, lastAdvanceMs, intervalMs, animate, live, marker, width, height, commits, full, progress, filesSort, tasksHideDone, paletteOpen, paletteQuery, paletteGhost, reveal, focusLocked }: Props) {
   if (!session) {
     return (
       <box style={{ flexGrow: 1, border: true, borderStyle: "rounded", borderColor: theme.accent, backgroundColor: TRANSPARENT, padding: 1, justifyContent: "center", alignItems: "center" }}>
@@ -65,7 +66,7 @@ export function Showcase({ session, panel, presented, cursor, playerTotal, infoO
           paddingLeft: 1, paddingRight: 1, backgroundColor: TRANSPARENT,
         }}
       >
-        {panel === "lens" && <Lens presented={presented} cursor={cursor} total={playerTotal} animate={animate} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} status={session.status} infoOn={infoOn} tokens={agg.tokens} ctxPools={agg.ctxPools} toolTimings={agg.toolTimings} width={width - 4} height={bodyHeight} />}
+        {panel === "lens" && <Lens presented={presented} cursor={cursor} total={playerTotal} animate={animate} live={live} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} status={session.status} infoOn={infoOn} tokens={agg.tokens} ctxPools={agg.ctxPools} toolTimings={agg.toolTimings} width={width - 4} height={bodyHeight} />}
         {panel === "log" && <Flow beats={presented} cursor={cursor} animate={animate} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} width={width - 4} height={bodyHeight} />}
         {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} sort={filesSort} />}
         {panel === "tasks" && <Tasks todos={agg.todos} lens={agg.lens} height={bodyHeight} progress={progress} hideDone={tasksHideDone} />}
