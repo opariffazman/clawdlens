@@ -111,6 +111,9 @@ export function App({ store, cwd }: { store: Store; cwd: string }) {
   const lastAdvanceMs = player ? player.lastAdvanceMs() : -1;
   const intervalMs = player ? player.intervalMs() : 1000;
   const animate = player ? shouldAnimate(player.mode(), lastAdvanceMs, intervalMs, Date.now()) : false;
+  // "live" = watching the live head: player playing AND caught up. Gates the
+  // ring keep-alive so a paused/replay scrub stays static.
+  const live = player ? player.mode() === "playing" && player.backlog() === 0 : false;
 
   // Force a full repaint whenever the scroll position or layout changes — the
   // moments stale ghost cells form. Pulse-only frames (cursor unchanged) keep
@@ -119,7 +122,7 @@ export function App({ store, cwd }: { store: Store; cwd: string }) {
   useEffect(() => {
     if (cursor !== prevCursor.current) { prevCursor.current = cursor; forceRepaint(); }
   });
-  useEffect(() => { forceRepaint(); }, [panel, selected?.id, picker.open, picker.stage, picker.query, picker.filtering, full, infoOn, showHelp, animate, palette.open, palette.query, palette.sugIndex, forceRepaint]);
+  useEffect(() => { forceRepaint(); }, [panel, selected?.id, picker.open, picker.stage, picker.query, picker.filtering, full, infoOn, showHelp, animate, live, palette.open, palette.query, palette.sugIndex, forceRepaint]);
 
   const switchTo = (id: string | null) => { if (id) setUserPinned(true); setSelectedId(id); };
 
@@ -250,6 +253,7 @@ export function App({ store, cwd }: { store: Store; cwd: string }) {
           lastAdvanceMs={lastAdvanceMs}
           intervalMs={intervalMs}
           animate={animate}
+          live={live}
           marker={marker}
           width={w}
           height={h}

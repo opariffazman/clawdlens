@@ -9,7 +9,7 @@ import {
 import { rankOf } from "../../core/pipeline";
 import type { Beat, IconKey, Status } from "../../core/types";
 import { theme, TRANSPARENT } from "../theme";
-import { breathe, lerpHex, pulsePhase } from "../anim";
+import { breathe, lerpHex, pulsePhase, ringSpin } from "../anim";
 import { iconFor } from "../icons";
 import { put, drawStr, clip, laneHexOf } from "./lens/draw";
 import { ICON_ART_7, ICON_ART_13, LABEL_ART, LABEL_H, type ArtKey } from "./lens/iconArt";
@@ -28,6 +28,7 @@ interface Props {
   cursor: number;
   total: number;
   animate: boolean;
+  live: boolean;
   lastAdvanceMs: number;
   intervalMs: number;
   status: Status;
@@ -165,11 +166,13 @@ function drawHud(buf: OptimizedBuffer, flow: ReturnType<typeof deriveFlow>, stat
   drawStr(buf, cx, top + 2, clip(rest, w - cx - 3), RGBA.fromHex(theme.dim), w, h);
 }
 
-export function Lens({ presented, cursor, total, animate, lastAdvanceMs, intervalMs, status, infoOn, tokens, ctxPools, toolTimings, width, height }: Props) {
+export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, intervalMs, status, infoOn, tokens, ctxPools, toolTimings, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const lensState = detectLensFromBeats(presented.slice(0, cursor));
   const ribbonOn = lensState.lensId === "superpowers";
   const animating = animate;
+  const { spin, busy } = ringSpin(status, live, animating);
+  const activeK = flow.main.activeKind;
 
   // sub-row occupants: default = latest skill + live agents; `i` = tool breakdown
   const items: SubItem[] = [];
@@ -255,18 +258,14 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const channelY = blockBottom;
   const loopOn = (backCount > 0 || hotBack !== null) && channelY < regionBottom;
 
-  const activeK = flow.main.activeKind;
   const ringKey = status === "waiting" ? "chat" : activeK && nl.boxes.has(activeK) ? activeK : null;
-  const ringMs = status === "waiting" ? RING_WAIT_MS : RING_MS;
-  // long thinks park the timeline (animate=false) but the model is still working —
-  // keep the think box breathing so the user sees life (n8n keeps its ring spinning).
-  const thinkPulse = (status === "working" || status === "running") && activeK === "think";
+  const ringMs = status === "waiting" ? RING_WAIT_MS : RING_MS; // waiting spins on the slower period
 
   return (
     <box
       style={{ width, height, backgroundColor: TRANSPARENT }}
       buffered
-      live={animate || thinkPulse}
+      live={animate || spin}
       renderAfter={(buffer: OptimizedBuffer) => {
         buffer.clear(TRANSPARENT);
         const now = Date.now();
@@ -316,7 +315,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const d = diamondCell(nl.boxes.get("tool")!);
           const wireDimCol = RGBA.fromHex(theme.wireDim);
           for (const c of sr.cells) put(buffer, c.x, c.y, c.ch, wireDimCol, width, height);
-          sr.circles.forEach((c, i) => drawSubNode(buffer, c, items[i]!, sr.labelY, now, animating, width, height));
+          sr.circles.forEach((c, i) => drawSubNode(buffer, c, items[i]!, sr.labelY, now, spin, width, height));
           put(buffer, d.x, d.y, "◇", RGBA.fromHex(theme.dim), width, height);
           if (items.length > sr.shown && sr.circles.length > 0) {
             const last = sr.circles[sr.circles.length - 1]!;
@@ -329,12 +328,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const r = nl.boxes.get(k)!;
           const active = k === activeK;
           const laneHex = k === "prompt" ? theme.coral : laneHexOf(k);
-          const pulseThis = thinkPulse && !animating && k === "think";
-          const pulseHex = pulseThis ? lerpHex(laneHex, theme.pulseHot, breathe(now)) : laneHex;
-          const border = RGBA.fromHex(
-            pulseThis ? pulseHex
-            : active ? (flow.main.errored ? theme.err : laneHex) : theme.dim,
-          );
+          const border = RGBA.fromHex(active ? (flow.main.errored ? theme.err : laneHex) : theme.dim);
           const detail =
             k === "prompt" ? `turn ${(flow.main.counts["chat"] ?? 0) + 1}`
             : k === "result" ? `✓${flow.main.ok} ✗${flow.main.err}`
@@ -348,7 +342,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
           const dLen = Math.min([...detail].length, r.w);
           const dx = r.x + ((r.w - dLen) >> 1);
           const hitsCircle = sr !== null && sr.circles.some((c) => detY >= c.y && detY < c.y + c.h && dx <= c.x + c.w - 1 && dx + dLen - 1 >= c.x);
-          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, hitsCircle ? "" : detail, border, pulseHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
+          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, hitsCircle ? "" : detail, border, laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
           // ports (chat's dangling output stays — n8n shows the bare port circle)
           if (k !== "prompt") put(buffer, portIn(r).x, portIn(r).y, "○", RGBA.fromHex(theme.dim), width, height);
           put(buffer, portOut(r).x, portOut(r).y, "●", RGBA.fromHex(theme.dim), width, height);
@@ -364,7 +358,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
         }
 
         // orbiting ring on the active (or waiting) node — n8n: errors stop the ring
-        if (ringKey && animating && !flow.main.errored && status !== "error") {
+        if (ringKey && spin && !flow.main.errored) {
           drawRing(buffer, nl.boxes.get(ringKey)!, ringKey === "prompt", now, ringMs, width, height); // rounded: unreachable today, future-proof for a prompt-ring
           const rr = nl.boxes.get(ringKey)!;
           if (ringKey !== "prompt") put(buffer, portIn(rr).x, portIn(rr).y, "○", RGBA.fromHex(theme.dim), width, height);
