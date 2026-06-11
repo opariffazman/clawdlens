@@ -188,6 +188,17 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
       }
     }
   } else {
+    // live: the running tool gets a breathing sub-node under its box, named (e.g. "Bash · npm test").
+    // Skip Task tools — they already show as agent sub-lanes below.
+    if (busy && activeK === "tool" && flow.main.activeTool && flow.main.activeTool !== "task" && flow.main.activeToolName) {
+      const detail = flow.main.detail && flow.main.detail !== flow.main.activeToolName ? ` · ${flow.main.detail}` : "";
+      items.push({
+        glyph: iconFor(flow.main.activeTool as IconKey),
+        label: `${flow.main.activeToolName}${detail}`,
+        live: true,
+        hex: laneHexOf("tool"),
+      });
+    }
     const lastGroup = lensState.skillGroups[lensState.skillGroups.length - 1];
     const skillName = flow.main.activeSkill ?? lastGroup?.skill;
     if (skillName) {
