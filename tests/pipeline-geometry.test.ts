@@ -136,6 +136,7 @@ test("subRow with one aligned child is a straight dashed drop", () => {
   const sr = subRow(tool, 1, 150, 10);
   expect(sr.shown).toBe(1);
   expect(sr.cells.every((c) => c.ch === "┆")).toBe(true);
+  expect(sr.labelW).toBe(11);   // want = 10 + 2 = 12, pitch = 12, labelW = 11
 });
 
 test("subRow caps shown by width and clamps circles inside the panel", () => {

@@ -149,7 +149,7 @@ export function subRow(tool: Rect, n: number, width: number, maxLabelLen: number
   const want = maxLabelLen + 2;                       // full-label pitch target
   const room = Math.floor(innerSpan / shown);         // per-item slot at this count
   const pitch = Math.max(PITCH_MIN, Math.min(want, room));
-  const labelW = Math.max(SUB_W, pitch - 1);
+  const labelW = pitch - 1;   // pitch ≥ PITCH_MIN = SUB_W + 3, so pitch - 1 ≥ SUB_W + 2 (no floor needed)
   const span = (shown - 1) * pitch;
   let cx0 = dx - (span >> 1);
   cx0 = Math.max(LEFT + (SUB_W >> 1), Math.min(cx0, width - 2 - ((SUB_W + 1) >> 1) - span));
