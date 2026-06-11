@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { tsToX, lensTimeline, heartbeatBuckets, economyView } from "../src/core/lens-bands";
+import { tsToX, lensTimeline, heartbeatBuckets, economyView, toolTimingView } from "../src/core/lens-bands";
 import type { Beat } from "../src/core/types";
 import { newSessionTokens } from "../src/core/types";
 
@@ -85,4 +85,13 @@ test("economyView: humanized in/out, cache% = cacheRead/(cacheRead+cacheCreate+i
 test("economyView: zero tokens -> sane zeros", () => {
   const v = economyView(newSessionTokens());
   expect(v).toEqual({ inTok: "0", outTok: "0", cachePct: 0, web: 0 });
+});
+
+test("toolTimingView sorts bottleneck-first and derives avg", () => {
+  const rows = toolTimingView({
+    Read: { count: 4, totalMs: 2000, minMs: 200, maxMs: 900 },
+    Bash: { count: 2, totalMs: 9000, minMs: 1000, maxMs: 8000 },
+  });
+  expect(rows.map((r) => r.name)).toEqual(["Bash", "Read"]);
+  expect(rows[0]).toEqual({ name: "Bash", count: 2, avgMs: 4500, minMs: 1000, maxMs: 8000, totalMs: 9000 });
 });

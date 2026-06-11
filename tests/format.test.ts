@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { statusGlyph, gaugeBar, sparkline, truncate, fmtCost, fmtTokens } from "../src/ui/format";
+import { statusGlyph, gaugeBar, sparkline, truncate, fmtCost, fmtTokens, fmtDur } from "../src/ui/format";
 
 test("statusGlyph maps status to glyph + color", () => {
   expect(statusGlyph("running").glyph).toBe("●");
@@ -29,4 +29,12 @@ test("fmt helpers", () => {
 });
 test("done gets a calm green check", () => {
   expect(statusGlyph("done")).toEqual({ glyph: "✓", color: "#5AF78E", pulse: false });
+});
+
+test("fmtDur scales ms→s→m", () => {
+  expect(fmtDur(400)).toBe("0.4s");
+  expect(fmtDur(2300)).toBe("2s");
+  expect(fmtDur(59_400)).toBe("59s");
+  expect(fmtDur(60_000)).toBe("1m00s");
+  expect(fmtDur(95_000)).toBe("1m35s");
 });

@@ -36,5 +36,13 @@ export function truncate(str: string, n: number): string {
 
 export function fmtCost(usd: number): string { return "$" + usd.toFixed(2); }
 
+export function fmtDur(ms: number): string {
+  if (ms < 1000) return (ms / 1000).toFixed(1) + "s";
+  const s = ms / 1000;
+  if (s < 60) return Math.floor(s) + "s";
+  const m = Math.floor(s / 60);
+  return `${m}m${String(Math.floor(s % 60)).padStart(2, "0")}s`;
+}
+
 function k(n: number): string { return n >= 1000 ? Math.round(n / 1000) + "k" : String(n); }
 export function fmtTokens(ctx: number, limit: number): string { return `${k(ctx)}/${k(limit)}`; }
