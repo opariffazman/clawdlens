@@ -125,6 +125,8 @@ export type PanelId = "lens" | "files" | "tasks" | "git" | "log";
 export const PANELS: PanelId[] = ["lens", "files", "tasks", "git", "log"];
 export const DEFAULT_PANEL: PanelId = "lens";
 
+export interface ToolTiming { count: number; totalMs: number; minMs: number; maxMs: number }
+
 export interface SessionState {
   id: string;
   file: string;
@@ -141,6 +143,7 @@ export interface SessionState {
   costUSD: number;
   beats: Beat[];                 // full history (lazy-paged beyond a cap by the store)
   toolStats: Record<string, number>;
+  toolTimings: Record<string, ToolTiming>; // resolved tool_use→tool_result durations per tool name
   fileHeat: Record<string, FileHeat>;
   todos: TodoItem[] | null;
   lens: LensState;
@@ -152,7 +155,7 @@ export interface SessionState {
   lastStopReason: string | null;
   lastBlockKind: string | null;  // 'thinking' | 'text' | 'tool_use'
   lastSkill: string | null;      // last surfaced skill (Skill tool_use OR attribution) — dedups the skill stage
-  pendingTools: Record<string, string>; // tool_use id -> beat id awaiting result
+  pendingTools: Record<string, { beatId: string; name: string; ts: number }>; // tool_use id -> beat + start, awaiting result
   lastErrored: boolean;
   openLanes: string[];           // open subagent lane ids
   beatSeq: number;               // monotonic id source

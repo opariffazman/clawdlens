@@ -118,6 +118,7 @@ export function newSession(id: string, file: string): SessionState {
     costUSD: 0,
     beats: [],
     toolStats: {},
+    toolTimings: {},
     fileHeat: {},
     todos: null,
     lens: newLensState(),
@@ -229,7 +230,7 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
       } else if (name === "Task") {
         const sub = String(b.input?.subagent_type ?? b.input?.description ?? "subagent");
         pushBeat(s, { ts, kind: "tool", iconKey: "task", label: `Task · ${sub}`, lane, toolUseId: b.id, skill: e.attributionSkill });
-        if (b.id) { s.openLanes = [...s.openLanes, b.id]; s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id }; }
+        if (b.id) { s.openLanes = [...s.openLanes, b.id]; s.pendingTools = { ...s.pendingTools, [b.id]: { beatId: s.beats[s.beats.length - 1]!.id, name, ts } }; }
       } else {
         const cmd = typeof b.input?.command === "string" ? (b.input.command as string) : undefined;
         const detail = name === "Bash"
@@ -237,7 +238,7 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
           : fileOf(b.input) ?? (typeof b.input?.query === "string" ? (b.input.query as string).slice(0, 60) : undefined);
         const milestone = name === "Bash" ? gitMilestone(cmd) : undefined;
         pushBeat(s, { ts, kind: "tool", iconKey: iconKeyFor(name), label: name, detail, lane, toolUseId: b.id, skill: e.attributionSkill, milestone });
-        if (b.id) s.pendingTools = { ...s.pendingTools, [b.id]: s.beats[s.beats.length - 1]!.id };
+        if (b.id) s.pendingTools = { ...s.pendingTools, [b.id]: { beatId: s.beats[s.beats.length - 1]!.id, name, ts } };
         bumpHeat(s, name, b.input, ts);
       }
       s.lastBlockKind = "tool_use";
@@ -255,14 +256,21 @@ function foldUser(s: SessionState, e: Entry, ts: number) {
     if (b.type !== "tool_result") continue;
     const id = b.tool_use_id;
     if (!id) continue;
-    const beatId = s.pendingTools[id];
-    if (beatId) {
-      s.beats = s.beats.map(bt => bt.id === beatId ? { ...bt, ok: !b.is_error } : bt);
+    const p = s.pendingTools[id];
+    if (p) {
+      s.beats = s.beats.map(bt => bt.id === p.beatId ? { ...bt, ok: !b.is_error } : bt);
+      const durMs = Math.max(0, ts - p.ts);
+      const cur = s.toolTimings[p.name];
+      s.toolTimings = {
+        ...s.toolTimings,
+        [p.name]: cur
+          ? { count: cur.count + 1, totalMs: cur.totalMs + durMs, minMs: Math.min(cur.minMs, durMs), maxMs: Math.max(cur.maxMs, durMs) }
+          : { count: 1, totalMs: durMs, minMs: durMs, maxMs: durMs },
+      };
       const np = { ...s.pendingTools }; delete np[id]; s.pendingTools = np;
     }
     if (s.openLanes.includes(id)) s.openLanes = s.openLanes.filter(l => l !== id);
     if (b.is_error) errored = true;
   }
   s.lastErrored = errored;
-  void ts;
 }
