@@ -95,6 +95,18 @@ test("wireLoop routes a rounded U below the row into the target's input port", (
   expect(cells[cells.length - 1]).toEqual({ x: 1, y: 4, ch: "▶" });
 });
 
+test("wireLoop above routes a rounded U over the row into the target's input port", () => {
+  const a = { x: 50, y: 5, w: 13, h: 7 };   // chat, mid at y=8
+  const b = { x: 2, y: 5, w: 13, h: 7 };    // think, mid at y=8
+  const cells = wireLoop(a, b, 2, "above");  // channel row above the boxes
+  expect(cells[0]).toEqual({ x: 63, y: 8, ch: "╯" });            // turn up out of chat
+  expect(cells.find((c) => c.ch === "╮")).toEqual({ x: 63, y: 2, ch: "╮" });
+  expect(cells.find((c) => c.ch === "╭")).toEqual({ x: 0, y: 2, ch: "╭" });
+  expect(cells.find((c) => c.ch === "╰")).toEqual({ x: 0, y: 8, ch: "╰" });
+  expect(cells[cells.length - 1]).toEqual({ x: 1, y: 8, ch: "▶" });
+  expect(cells.filter((c) => c.ch === "─").every((c) => c.y === 2)).toBe(true);
+});
+
 test("subRow pitch resolves to SUB_PITCH at the legacy label budget, centered under the diamond", () => {
   const tool = { x: 60, y: 2, w: 13, h: 7 };       // diamond at x=66, y=8
   const sr = subRow(tool, 2, 150, 14);             // maxLabelLen 14 → want 16 → pitch 16
