@@ -282,3 +282,26 @@ test("plain-string user content counts to the user pool", () => {
   const s = feed([{ type: "user", message: { content: "hello world!" } }]); // 12 chars → 3
   expect(s.ctxPools.user).toBe(3);
 });
+
+test("sidechain content does not pollute ctxPools", () => {
+  const s = feed([
+    { type: "assistant", isSidechain: true, message: { content: [
+      { type: "thinking", thinking: "y".repeat(400) },
+      { type: "text", text: "z".repeat(400) },
+      { type: "tool_use", id: "st1", name: "Read", input: {} },
+    ] } },
+    { type: "user", isSidechain: true, message: { content: [{ type: "text", text: "x".repeat(400) }] } },
+    { type: "user", isSidechain: true, message: { content: [{ type: "tool_result", tool_use_id: "st1", content: "r".repeat(400) }] } },
+  ]);
+  expect(s.ctxPools).toEqual({ user: 0, tools: 0, subagents: 0, reasoning: 0 });
+});
+
+test("duplicate tool_result bumps pools once and keeps Task attribution", () => {
+  const s = feed([
+    { type: "assistant", timestamp: "2026-06-06T00:00:00Z", message: { content: [{ type: "tool_use", id: "t2", name: "Task", input: {} }] } },
+    { type: "user", timestamp: "2026-06-06T00:00:01Z", message: { content: [{ type: "tool_result", tool_use_id: "t2", content: "s".repeat(200) }] } },
+    { type: "user", timestamp: "2026-06-06T00:00:02Z", message: { content: [{ type: "tool_result", tool_use_id: "t2", content: "s".repeat(200) }] } },
+  ]);
+  expect(s.ctxPools.subagents).toBe(50);
+  expect(s.ctxPools.tools).toBe(0);
+});
