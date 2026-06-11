@@ -1,4 +1,4 @@
-import type { Beat, SessionTokens } from "./types";
+import type { Beat, SessionTokens, ToolTiming } from "./types";
 import { detectLensFromBeats } from "./lens";
 
 export interface Span { key: string; label: string; startTs: number; endTs: number }
@@ -87,6 +87,15 @@ export function heartbeatBuckets(beats: Beat[], cursor: number, width: number): 
     buckets[i]!.kind = best;
   }
   return buckets;
+}
+
+export interface ToolTimingRow { name: string; count: number; avgMs: number; minMs: number; maxMs: number; totalMs: number }
+
+// bottleneck-first: total time spent waiting on each tool
+export function toolTimingView(timings: Record<string, ToolTiming>): ToolTimingRow[] {
+  return Object.entries(timings)
+    .map(([name, t]) => ({ name, count: t.count, avgMs: Math.round(t.totalMs / t.count), minMs: t.minMs, maxMs: t.maxMs, totalMs: t.totalMs }))
+    .sort((a, b) => b.totalMs - a.totalMs);
 }
 
 export interface EconomyView { inTok: string; outTok: string; cachePct: number; web: number }
