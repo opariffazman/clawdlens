@@ -27,3 +27,6 @@ test("fmt helpers", () => {
   expect(fmtCost(0.4239)).toBe("$0.42");
   expect(fmtTokens(38000, 200000)).toBe("38k/200k");
 });
+test("done gets a calm green check", () => {
+  expect(statusGlyph("done")).toEqual({ glyph: "✓", color: "#5AF78E", pulse: false });
+});
