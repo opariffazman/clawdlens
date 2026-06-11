@@ -143,6 +143,25 @@ test("subRow floors pitch and overflows shown when many tools crowd the width", 
   expect(sr.labelW).toBe(PITCH_MIN - 1);           // 7
 });
 
+test("subRow trunkRows lengthens the trunk so the fan + circles drop below the label band", () => {
+  const tool = { x: 60, y: 2, w: 13, h: 7 };       // ◇ at x=66, y=8
+  const sr = subRow(tool, 2, 150, 14, 4);          // trunkRows=4 (miniwi label height)
+  // trunk: four ┆ rows below the box, behind the label band (y=9..12)
+  const trunk = sr.cells.filter((c) => c.ch === "┆" && c.x === 66).map((c) => c.y).sort((a, b) => a - b);
+  expect(trunk).toEqual([9, 10, 11, 12]);
+  // fan one row under the trunk (y = 8 + 1 + 4 = 13), circles + labels follow
+  expect(sr.cells.some((c) => c.y === 13 && c.ch === "┴")).toBe(true);
+  expect(sr.circles[0]!.y).toBe(15);               // fanY + 2
+  expect(sr.labelY).toBe(18);                       // fanY + 2 + SUB_H
+});
+
+test("subRow default trunkRows keeps the legacy single-row trunk", () => {
+  const tool = { x: 60, y: 2, w: 13, h: 7 };
+  const sr = subRow(tool, 2, 150, 14);             // trunkRows defaults to 1
+  expect(sr.cells.filter((c) => c.ch === "┆" && c.x === 66).map((c) => c.y)).toEqual([9]);
+  expect(sr.labelY).toBe(8 + SUB_ROWS);
+});
+
 test("subRow with one aligned child is a straight dashed drop", () => {
   const tool = { x: 60, y: 2, w: 13, h: 7 };
   const sr = subRow(tool, 1, 150, 10);

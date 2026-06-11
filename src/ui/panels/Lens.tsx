@@ -215,10 +215,13 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
   let ribbon = ribbonOn ? 2 : 0, econ = 1, ctxB = 1, heart = 1, time = hasTimeline ? 3 : 0;
   let mode: BoxMode = "art";
   let bigNames = true; // miniwi node names; falls back to 1-row plain under pressure
-  let sub = items.length > 0 ? SUB_ROWS : 0;
-  // sub-row rows OVERLAP the name rows (wires pass behind labels, as in n8n)
+  let subOn = items.length > 0;
+  // The ┆ trunk threads down behind the miniwi label band; the fan + circles drop
+  // CLEAR below it (trunkRows = label height), so wording never sits on a sub-node.
+  const trunkRows = () => (bigNames ? LABEL_H : 1);
   const nameRows = () => (bigNames ? LABEL_H : 1) + 1; // + detail line
-  const blockNeed = () => (mode === "art" ? BOX_H_ART : BOX_H_GLYPH) + Math.max(sub, nameRows()) + 1; // +1 loop channel
+  const subSpan = () => (subOn ? trunkRows() + (SUB_ROWS - 1) : 0); // trunk + fan + drop + circles + label
+  const blockNeed = () => (mode === "art" ? BOX_H_ART : BOX_H_GLYPH) + Math.max(subSpan(), nameRows()) + 1; // +1 loop channel
   const usable = hudTop - TOP;
   while (usable - ribbon - econ - ctxB - heart - time < blockNeed()) {
     if (bigNames) bigNames = false;
@@ -228,16 +231,16 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
     else if (heart) heart = 0;
     else if (time) time = 0;
     else if (ribbon) ribbon = 0;
-    else if (sub) sub = 0;
+    else if (subOn) subOn = false;
     else break;
   }
   const showRibbon = ribbon > 0, showEconomy = econ > 0, showCtx = ctxB > 0, showHeartbeat = heart > 0, showTimeline = time > 0;
-  const showSub = sub > 0;
+  const showSub = subOn;
 
   const regionTop = TOP + ribbon;
   const regionBottom = hudTop - (econ + ctxB + heart + time);
   const boxH = mode === "art" ? BOX_H_ART : BOX_H_GLYPH;
-  const blockH = boxH + Math.max(showSub ? SUB_ROWS : 0, (bigNames ? LABEL_H : 1) + 1);
+  const blockH = boxH + Math.max(subSpan(), nameRows());
   const loopReserve = 1;
   const top = Math.max(regionTop + loopReserve, regionTop + loopReserve + ((regionBottom - regionTop - loopReserve - blockH) >> 1));
   const nl: NodeLayout = nodeLayout(width, top, mode);
@@ -265,7 +268,7 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
   }
 
   const maxLabelLen = items.reduce((m, it) => Math.max(m, [...it.label].length), 0);
-  const sr = showSub ? subRow(nl.boxes.get("tool")!, items.length, width, maxLabelLen) : null;
+  const sr = showSub ? subRow(nl.boxes.get("tool")!, items.length, width, maxLabelLen, trunkRows()) : null;
   const channelY = top - 1;
   const loopOn = (backCount > 0 || hotBack !== null) && channelY >= regionTop;
 
@@ -347,13 +350,16 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
             : `×${flow.main.counts[k] ?? 0}`;
           const art = mode === "art" ? (nl.wide ? ICON_ART_13 : ICON_ART_7)[STAGE_ART[k] ?? "tool"] : null;
           const bigLabel = bigNames ? LABEL_ART[k as keyof typeof LABEL_ART] ?? null : null;
-          // miniwi names push the detail line onto the sub-row circles' middle row —
-          // suppress a detail that would punch through a circle (it stays in glyph tier)
+          // miniwi names drop the detail line to the sub-row's fan row (tool box) —
+          // suppress a detail that would punch through the fan or a circle (stays glyph tier)
           const detY = r.y + r.h + (bigLabel ? LABEL_H : 1);
           const dLen = Math.min([...detail].length, r.w);
           const dx = r.x + ((r.w - dLen) >> 1);
-          const hitsCircle = sr !== null && sr.circles.some((c) => detY >= c.y && detY < c.y + c.h && dx <= c.x + c.w - 1 && dx + dLen - 1 >= c.x);
-          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, hitsCircle ? "" : detail, border, laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
+          const hitsSub = sr !== null && (
+            sr.circles.some((c) => detY >= c.y && detY < c.y + c.h && dx <= c.x + c.w - 1 && dx + dLen - 1 >= c.x) ||
+            sr.cells.some((c) => c.y === detY && c.x >= dx && c.x <= dx + dLen - 1)
+          );
+          drawNodeBox(buffer, r, art, iconFor(STAGE_GLYPH[k] ?? "tool"), k, k, bigLabel, hitsSub ? "" : detail, border, laneHex, RGBA.fromHex(active ? theme.fg : theme.dim), width, height);
           // ports (chat's dangling output stays — n8n shows the bare port circle)
           if (k !== "prompt") put(buffer, portIn(r).x, portIn(r).y, "○", RGBA.fromHex(theme.dim), width, height);
           put(buffer, portOut(r).x, portOut(r).y, "●", RGBA.fromHex(theme.dim), width, height);

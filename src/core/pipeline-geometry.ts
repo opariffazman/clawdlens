@@ -150,7 +150,9 @@ export interface SubRowLayout {
 // dashed trunk, rounded tree fan, dashed drops into 3-row circles, names below.
 // Pitch + label width are derived from the panel width and item count: spread to
 // full labels when slack allows, floor at PITCH_MIN then overflow to caller's +N.
-export function subRow(tool: Rect, n: number, width: number, maxLabelLen: number): SubRowLayout {
+// trunkRows lengthens the vertical ┆ trunk so the fan + circles drop CLEAR of the
+// node's miniwi label band (caller passes the label height); default 1 = legacy.
+export function subRow(tool: Rect, n: number, width: number, maxLabelLen: number, trunkRows = 1): SubRowLayout {
   const dx = tool.x + (tool.w >> 1);
   const dy = tool.y + tool.h - 1;
   const innerSpan = width - LEFT - 2;
@@ -167,8 +169,8 @@ export function subRow(tool: Rect, n: number, width: number, maxLabelLen: number
   let cx0 = dx - (span >> 1);
   cx0 = Math.max(LEFT + (SUB_W >> 1), Math.min(cx0, width - 2 - ((SUB_W + 1) >> 1) - span));
   const xs = Array.from({ length: shown }, (_, i) => cx0 + i * pitch);
-  const fanY = dy + 2;
-  cells.push({ x: dx, y: dy + 1, ch: "┆" });
+  const fanY = dy + 1 + trunkRows;                    // trunk occupies dy+1 .. dy+trunkRows
+  for (let ty = dy + 1; ty < fanY; ty++) cells.push({ x: dx, y: ty, ch: "┆" });
   const lo = Math.min(xs[0]!, dx), hi = Math.max(xs[xs.length - 1]!, dx);
   if (lo === hi) {
     cells.push({ x: dx, y: fanY, ch: "┆" });
