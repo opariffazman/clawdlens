@@ -117,8 +117,8 @@ function drawRing(buf: OptimizedBuffer, r: Rect, rounded: boolean, now: number, 
   });
 }
 
-function drawSubNode(buf: OptimizedBuffer, c: Rect, it: SubItem, labelY: number, now: number, animating: boolean, w: number, h: number) {
-  const hex = it.live && animating ? lerpHex(it.hex, theme.pulseHot, breathe(now)) : it.hex;
+function drawSubNode(buf: OptimizedBuffer, c: Rect, it: SubItem, labelY: number, now: number, pulse: boolean, w: number, h: number) {
+  const hex = it.live && pulse ? lerpHex(it.hex, theme.pulseHot, breathe(now)) : it.hex;
   const border = RGBA.fromHex(it.live ? hex : theme.dim);
   for (const cell of borderCells(c)) {
     const rounded = cell.ch === "┌" ? "╭" : cell.ch === "┐" ? "╮" : cell.ch === "└" ? "╰" : cell.ch === "┘" ? "╯" : cell.ch;
@@ -191,10 +191,10 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
     // live: the running tool gets a breathing sub-node under its box, named (e.g. "Bash · npm test").
     // Skip Task tools — they already show as agent sub-lanes below.
     if (busy && activeK === "tool" && flow.main.activeTool && flow.main.activeTool !== "task" && flow.main.activeToolName) {
-      const detail = flow.main.detail && flow.main.detail !== flow.main.activeToolName ? ` · ${flow.main.detail}` : "";
+      const toolDetail = flow.main.detail && flow.main.detail !== flow.main.activeToolName ? ` · ${flow.main.detail}` : "";
       items.push({
         glyph: iconFor(flow.main.activeTool as IconKey),
-        label: `${flow.main.activeToolName}${detail}`,
+        label: `${flow.main.activeToolName}${toolDetail}`,
         live: true,
         hex: laneHexOf("tool"),
       });
