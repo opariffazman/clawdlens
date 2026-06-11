@@ -1,6 +1,5 @@
 import { test, expect } from "bun:test";
-import { spinnerFrame, pulseIntensity, lerpHex, pulsePhase, cometColor, breathe } from "../src/ui/anim";
-import { shouldAnimate } from "../src/ui/anim";
+import { spinnerFrame, pulseIntensity, lerpHex, pulsePhase, cometColor, breathe, shouldAnimate, ringSpin } from "../src/ui/anim";
 
 test("spinnerFrame cycles", () => {
   const a = spinnerFrame(0);
@@ -70,4 +69,30 @@ test("shouldAnimate: only live + recently advanced", () => {
   expect(shouldAnimate("playing", 1000, 200, 1390)).toBe(true);
   // playing, gone quiet (> 2 intervals) → false
   expect(shouldAnimate("playing", 1000, 200, 1500)).toBe(false);
+});
+
+test("ringSpin: live working/running spins; idle/done/dormant still", () => {
+  expect(ringSpin("working", true, false)).toEqual({ spin: true, busy: true });
+  expect(ringSpin("running", true, false)).toEqual({ spin: true, busy: true });
+  expect(ringSpin("idle", true, false)).toEqual({ spin: false, busy: false });
+  expect(ringSpin("done", true, false)).toEqual({ spin: false, busy: false });
+  expect(ringSpin("dormant", true, false)).toEqual({ spin: false, busy: false });
+});
+
+test("ringSpin: live waiting spins but is not 'busy'", () => {
+  expect(ringSpin("waiting", true, false)).toEqual({ spin: true, busy: false });
+});
+
+test("ringSpin: not live → no keep-alive (paused/replay scrub stays static)", () => {
+  expect(ringSpin("working", false, false)).toEqual({ spin: false, busy: false });
+  expect(ringSpin("waiting", false, false)).toEqual({ spin: false, busy: false });
+});
+
+test("ringSpin: animating (replay reveal) spins regardless of live", () => {
+  expect(ringSpin("idle", false, true)).toEqual({ spin: true, busy: false });
+  expect(ringSpin("working", true, true)).toEqual({ spin: true, busy: true });
+});
+
+test("ringSpin: error never spins", () => {
+  expect(ringSpin("error", true, true)).toEqual({ spin: false, busy: false });
 });
