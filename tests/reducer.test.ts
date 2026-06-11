@@ -260,3 +260,25 @@ test("duplicate tool_result for the same id counts once", () => {
   ]);
   expect(s.toolTimings["Bash"]!.count).toBe(1);
 });
+
+test("ctxPools attribute content estimates per category", () => {
+  const s = feed([
+    { type: "user", message: { content: [{ type: "text", text: "x".repeat(40) }] } },          // user: 10
+    { type: "assistant", message: { content: [
+      { type: "thinking", thinking: "y".repeat(80) },                                          // reasoning: 20
+      { type: "text", text: "z".repeat(40) },                                                  // reasoning: +10
+      { type: "tool_use", id: "t1", name: "Bash", input: { command: "ls" } },
+      { type: "tool_use", id: "t2", name: "Task", input: { subagent_type: "Explore" } },
+    ] } },
+    { type: "user", message: { content: [
+      { type: "tool_result", tool_use_id: "t1", content: "r".repeat(400) },                    // tools: 100
+      { type: "tool_result", tool_use_id: "t2", content: [{ type: "text", text: "s".repeat(200) }] }, // subagents: 50
+    ] } },
+  ]);
+  expect(s.ctxPools).toEqual({ user: 10, tools: 100, subagents: 50, reasoning: 30 });
+});
+
+test("plain-string user content counts to the user pool", () => {
+  const s = feed([{ type: "user", message: { content: "hello world!" } }]); // 12 chars → 3
+  expect(s.ctxPools.user).toBe(3);
+});

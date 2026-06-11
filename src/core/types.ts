@@ -109,6 +109,8 @@ export function newSessionTokens(): SessionTokens {
   return { input: 0, output: 0, cacheRead: 0, cacheCreate: 0, contextTokens: 0, maxContextTokens: 0, contextPct: 0, webCalls: 0 };
 }
 
+export interface CtxPools { user: number; tools: number; subagents: number; reasoning: number }
+
 export interface LensState {
   lensId: string | null;
   activePhase: string | null;
@@ -140,6 +142,7 @@ export interface SessionState {
   startedTs: number;
   lastActivityTs: number;
   tokens: SessionTokens;
+  ctxPools: CtxPools;            // estimated context attribution (system = residual, derived in view)
   costUSD: number;
   beats: Beat[];                 // full history (lazy-paged beyond a cap by the store)
   toolStats: Record<string, number>;
