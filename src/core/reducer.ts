@@ -1,9 +1,10 @@
 import {
   type Entry, type SessionState, type ContentBlock, type Usage,
+  type CtxPools,
   newSessionTokens, newLensState,
 } from "./types";
 import type { IconKey, TodoItem } from "./types";
-import { addUsage, contextTokens, effectiveContextLimit, estimateCostUSD } from "./tokens";
+import { addUsage, contextTokens, effectiveContextLimit, estimateCostUSD, estimateTokens } from "./tokens";
 
 export function gitMilestone(command: string | undefined): "commit" | "branch" | undefined {
   if (!command) return undefined;
@@ -44,6 +45,19 @@ export function iconKeyFor(name: string): IconKey {
 function fileOf(input: Record<string, unknown> | undefined): string | undefined {
   const p = input?.file_path ?? input?.path ?? input?.notebook_path;
   return typeof p === "string" ? basename(p) : undefined;
+}
+
+// tool_result content is a string or an array of text-ish blocks — flatten for estimation
+function resultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content.map((c) => (typeof c === "string" ? c : c && typeof (c as ContentBlock).text === "string" ? (c as ContentBlock).text! : "")).join("");
+  }
+  return "";
+}
+
+function bumpPool(s: SessionState, key: keyof CtxPools, tok: number): void {
+  if (tok > 0) s.ctxPools = { ...s.ctxPools, [key]: s.ctxPools[key] + tok };
 }
 
 function nextBeatId(s: SessionState): string { s.beatSeq += 1; return `${s.id}:${s.beatSeq}`; }
@@ -115,6 +129,7 @@ export function newSession(id: string, file: string): SessionState {
     status: "idle",
     startedTs: 0, lastActivityTs: 0,
     tokens: newSessionTokens(),
+    ctxPools: { user: 0, tools: 0, subagents: 0, reasoning: 0 },
     costUSD: 0,
     beats: [],
     toolStats: {},
@@ -204,6 +219,7 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
   }
 
   const lane = laneFor(e, s);
+  const main = !e.isSidechain;
   // Surface skills activated WITHOUT a Skill tool_use (e.g. slash-invoked like
   // `/bootcamp-session`): emit a skill beat when attribution switches to a new
   // skill on the main lane. The Skill tool_use path below also sets s.lastSkill,
@@ -215,9 +231,11 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
   const blocks = Array.isArray(m.content) ? m.content : [];
   for (const b of blocks as ContentBlock[]) {
     if (b.type === "thinking") {
+      if (main) bumpPool(s, "reasoning", estimateTokens(b.thinking ?? ""));
       pushBeat(s, { ts, kind: "thinking", iconKey: "thinking", label: "thinking", lane, skill: e.attributionSkill });
       s.lastBlockKind = "thinking";
     } else if (b.type === "text") {
+      if (main) bumpPool(s, "reasoning", estimateTokens(b.text ?? ""));
       const text = (b.text ?? "").trim();
       if (text) { pushBeat(s, { ts, kind: "text", iconKey: "text", label: "says", detail: text.slice(0, 80), lane, skill: e.attributionSkill }); s.lastBlockKind = "text"; }
     } else if (b.type === "tool_use") {
@@ -250,14 +268,18 @@ function foldAssistant(s: SessionState, e: Entry, ts: number) {
 }
 
 function foldUser(s: SessionState, e: Entry, ts: number) {
+  const main = !e.isSidechain;
+  if (main && typeof e.message?.content === "string") bumpPool(s, "user", estimateTokens(e.message.content));
   const blocks = Array.isArray(e.message?.content) ? e.message!.content as ContentBlock[] : [];
   let errored = false;
   for (const b of blocks) {
+    if (b.type === "text") { if (main) bumpPool(s, "user", estimateTokens(b.text ?? "")); continue; }
     if (b.type !== "tool_result") continue;
     const id = b.tool_use_id;
     if (!id) continue;
     const p = s.pendingTools[id];
     if (p) {
+      if (main) bumpPool(s, p.name === "Task" ? "subagents" : "tools", estimateTokens(resultText(b.content)));
       s.beats = s.beats.map(bt => bt.id === p.beatId ? { ...bt, ok: !b.is_error } : bt);
       // timestamp-less entries fold with ts=0 (whole-file load) — a real-epoch
       // counterpart would yield a decades-long garbage duration; skip those pairs
