@@ -19,7 +19,7 @@ export function createPlayer(opts: PlayerOpts = {}) {
     const out: Beat[] = [];
     for (const b of beats) {
       const last = out[out.length - 1];
-      if (last && last.kind === b.kind && last.label === b.label && last.lane === b.lane) {
+      if (last && last.kind === b.kind && last.label === b.label && last.lane === b.lane && last.ok !== false && b.ok !== false) {
         out[out.length - 1] = { ...last, count: last.count + b.count, snap: b.snap ?? last.snap };
       } else {
         out.push({ ...b });
@@ -76,5 +76,18 @@ export function createPlayer(opts: PlayerOpts = {}) {
     stepForward() { pause(); cursor = Math.min(coalesced.length, cursor + 1); },
     replay() { cursor = 0; play(); },
     toLive() { cursor = coalesced.length; play(); },
+    jumpError(dir: 1 | -1): boolean {
+      const head = cursor - 1;
+      if (dir > 0) {
+        for (let i = head + 1; i < coalesced.length; i++) {
+          if (coalesced[i]!.ok === false) { cursor = i + 1; pause(); return true; }
+        }
+      } else {
+        for (let i = head - 1; i >= 0; i--) {
+          if (coalesced[i]!.ok === false) { cursor = i + 1; pause(); return true; }
+        }
+      }
+      return false;
+    },
   };
 }
