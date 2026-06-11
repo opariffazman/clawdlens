@@ -24,7 +24,7 @@ export function drawSkillTimeline(buf: OptimizedBuffer, x: number, y: number, w:
   const tl = lensTimeline(beats, cursor);
   drawLane(buf, x, y, w, "skills", tl.skills, tl.range, (s) => s.label, h);
   drawLane(buf, x, y + 1, w, "agents", tl.agents, tl.range, () => "task", h);
-  // axis row: playhead + milestone ticks
+  // axis row: playhead + error/milestone ticks (milestones drawn last — rarer signal wins the cell)
   const trackX = x + LABEL_W;
   const trackW = Math.max(1, w - LABEL_W - 1);
   const ay = y + 2;
