@@ -107,6 +107,8 @@ export function wireForward(a: Rect, b: Rect, label?: string): Cell[] {
 // backward wire: exits just right of a's output port, rounded U in a channel row
 // (n8n smoothstep), rises/drops to just left of b and enters b's input port with ▶.
 // dir "below" (default) routes under the row; "above" mirrors it over the row.
+// Precondition: channelY sits outside the box rows (below: channelY > midA/midB;
+// above: channelY < midA/midB). channelY == a mid would overlap the corner cells.
 export function wireLoop(a: Rect, b: Rect, channelY: number, dir: "above" | "below" = "below"): Cell[] {
   const cells: Cell[] = [];
   const midA = a.y + (a.h >> 1);
