@@ -259,14 +259,18 @@ function foldUser(s: SessionState, e: Entry, ts: number) {
     const p = s.pendingTools[id];
     if (p) {
       s.beats = s.beats.map(bt => bt.id === p.beatId ? { ...bt, ok: !b.is_error } : bt);
-      const durMs = Math.max(0, ts - p.ts);
-      const cur = s.toolTimings[p.name];
-      s.toolTimings = {
-        ...s.toolTimings,
-        [p.name]: cur
-          ? { count: cur.count + 1, totalMs: cur.totalMs + durMs, minMs: Math.min(cur.minMs, durMs), maxMs: Math.max(cur.maxMs, durMs) }
-          : { count: 1, totalMs: durMs, minMs: durMs, maxMs: durMs },
-      };
+      // timestamp-less entries fold with ts=0 (whole-file load) — a real-epoch
+      // counterpart would yield a decades-long garbage duration; skip those pairs
+      if (p.ts > 0 && ts > 0) {
+        const durMs = Math.max(0, ts - p.ts);
+        const cur = s.toolTimings[p.name];
+        s.toolTimings = {
+          ...s.toolTimings,
+          [p.name]: cur
+            ? { count: cur.count + 1, totalMs: cur.totalMs + durMs, minMs: Math.min(cur.minMs, durMs), maxMs: Math.max(cur.maxMs, durMs) }
+            : { count: 1, totalMs: durMs, minMs: durMs, maxMs: durMs },
+        };
+      }
       const np = { ...s.pendingTools }; delete np[id]; s.pendingTools = np;
     }
     if (s.openLanes.includes(id)) s.openLanes = s.openLanes.filter(l => l !== id);

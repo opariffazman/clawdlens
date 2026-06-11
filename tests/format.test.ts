@@ -35,5 +35,6 @@ test("fmtDur scales ms→s→m", () => {
   expect(fmtDur(400)).toBe("0.4s");
   expect(fmtDur(2300)).toBe("2s");
   expect(fmtDur(59_400)).toBe("59s");
+  expect(fmtDur(60_000)).toBe("1m00s");
   expect(fmtDur(95_000)).toBe("1m35s");
 });

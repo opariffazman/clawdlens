@@ -244,3 +244,19 @@ test("unresolved tool_use contributes no timing", () => {
   ]);
   expect(s.toolTimings["Read"]).toBeUndefined();
 });
+
+test("entries without timestamps fold no timing (whole-file load uses now=0)", () => {
+  let s = newSession("sid", "/home/u/.claude/projects/-home-u-repo-foo/sid.jsonl");
+  s = applyEntry(s, { type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] } }, 0);
+  s = applyEntry(s, { type: "user", timestamp: "2026-06-06T00:00:05Z", message: { content: [{ type: "tool_result", tool_use_id: "t1" }] } }, 0);
+  expect(s.toolTimings["Bash"]).toBeUndefined(); // no 56-year garbage duration
+});
+
+test("duplicate tool_result for the same id counts once", () => {
+  const s = feed([
+    { type: "assistant", timestamp: "2026-06-06T00:00:00Z", message: { content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] } },
+    { type: "user", timestamp: "2026-06-06T00:00:01Z", message: { content: [{ type: "tool_result", tool_use_id: "t1" }] } },
+    { type: "user", timestamp: "2026-06-06T00:00:02Z", message: { content: [{ type: "tool_result", tool_use_id: "t1" }] } },
+  ]);
+  expect(s.toolTimings["Bash"]!.count).toBe(1);
+});
