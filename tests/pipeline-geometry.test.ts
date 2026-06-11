@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { nodeLayout, BOX_W, BOX_W_WIDE, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell, wireForward, wireLoop, subRow, subPortCell, SUB_W, SUB_H, SUB_PITCH, SUB_ROWS, LEFT, TOP } from "../src/core/pipeline-geometry";
+import { nodeLayout, BOX_W, BOX_W_WIDE, BOX_W_NARROW, BOX_H_ART, BOX_H_GLYPH, borderCells, portIn, portOut, badgeCell, diamondCell, boltCell, wireForward, wireLoop, subRow, subPortCell, SUB_W, SUB_H, SUB_PITCH, PITCH_MIN, SUB_ROWS, LEFT, TOP } from "../src/core/pipeline-geometry";
 
 test("nodeLayout full width: trigger + labels, 5 boxes in row order, non-overlapping", () => {
   const nl = nodeLayout(150, TOP, "art");
@@ -95,35 +95,52 @@ test("wireLoop routes a rounded U below the row into the target's input port", (
   expect(cells[cells.length - 1]).toEqual({ x: 1, y: 4, ch: "▶" });
 });
 
-test("subRow lays circles at SUB_PITCH centered under the tool diamond", () => {
+test("subRow pitch resolves to SUB_PITCH at the legacy label budget, centered under the diamond", () => {
   const tool = { x: 60, y: 2, w: 13, h: 7 };       // diamond at x=66, y=8
-  const sr = subRow(tool, 2, 150);
+  const sr = subRow(tool, 2, 150, 14);             // maxLabelLen 14 → want 16 → pitch 16
   expect(sr.shown).toBe(2);
   expect(sr.circles.length).toBe(2);
   const c0 = sr.circles[0]!, c1 = sr.circles[1]!;
-  expect(c1.x - c0.x).toBe(SUB_PITCH);
+  expect(c1.x - c0.x).toBe(SUB_PITCH);             // 16
+  expect(sr.labelW).toBe(SUB_PITCH - 1);           // 15
   expect(c0.w).toBe(SUB_W);
   expect(c0.h).toBe(SUB_H);
-  // rows: ┆ at dy+1, fan at dy+2, ┆ at dy+3, circle top at dy+4, label at dy+7
   expect(c0.y).toBe(8 + 4);
   expect(sr.labelY).toBe(8 + SUB_ROWS);
-  // fan glyphs: rounded ends, ┴ junction under the trunk
   const fan = sr.cells.filter((c) => c.y === 10);
   expect(fan.find((c) => c.ch === "╭")).toBeTruthy();
   expect(fan.find((c) => c.ch === "╮")).toBeTruthy();
   expect(fan.find((c) => c.x === 66)!.ch).toBe("┴");
 });
 
+test("subRow spreads pitch toward full labels when wide with few items", () => {
+  const tool = { x: 80, y: 2, w: 13, h: 7 };
+  const sr = subRow(tool, 2, 200, 30);             // lots of slack, long labels
+  expect(sr.shown).toBe(2);
+  const c0 = sr.circles[0]!, c1 = sr.circles[1]!;
+  expect(c1.x - c0.x).toBe(32);                    // want = 30 + 2, fits
+  expect(sr.labelW).toBe(31);                      // pitch - 1
+});
+
+test("subRow floors pitch and overflows shown when many tools crowd the width", () => {
+  const tool = { x: 50, y: 2, w: 13, h: 7 };
+  const sr = subRow(tool, 20, 120, 20);            // 20 items, tight columns
+  expect(sr.shown).toBe(14);                       // capped → caller shows +6 more
+  const c0 = sr.circles[0]!, c1 = sr.circles[1]!;
+  expect(c1.x - c0.x).toBe(PITCH_MIN);             // floored to 8
+  expect(sr.labelW).toBe(PITCH_MIN - 1);           // 7
+});
+
 test("subRow with one aligned child is a straight dashed drop", () => {
   const tool = { x: 60, y: 2, w: 13, h: 7 };
-  const sr = subRow(tool, 1, 150);
+  const sr = subRow(tool, 1, 150, 10);
   expect(sr.shown).toBe(1);
   expect(sr.cells.every((c) => c.ch === "┆")).toBe(true);
 });
 
 test("subRow caps shown by width and clamps circles inside the panel", () => {
   const tool = { x: 10, y: 2, w: 13, h: 7 };
-  const sr = subRow(tool, 8, 60);
+  const sr = subRow(tool, 8, 60, 10);
   expect(sr.shown).toBeLessThan(8);
   for (const c of sr.circles) {
     expect(c.x).toBeGreaterThanOrEqual(LEFT);
@@ -137,7 +154,8 @@ test("subPortCell is the circle's top-center", () => {
 
 test("subRow with zero items (or no width) is empty", () => {
   const tool = { x: 60, y: 2, w: 13, h: 7 };
-  expect(subRow(tool, 0, 150).shown).toBe(0);
-  expect(subRow(tool, 0, 150).cells).toEqual([]);
-  expect(subRow(tool, 3, 5).shown).toBe(0);
+  expect(subRow(tool, 0, 150, 10).shown).toBe(0);
+  expect(subRow(tool, 0, 150, 10).cells).toEqual([]);
+  expect(subRow(tool, 0, 150, 10).labelW).toBe(0);
+  expect(subRow(tool, 3, 5, 10).shown).toBe(0);
 });

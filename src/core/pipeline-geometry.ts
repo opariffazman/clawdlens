@@ -16,6 +16,7 @@ export const SUB_ROWS = 7;           // ┆ + fan + ┆ + 3-row circle + label
 export const SUB_W = 5;
 export const SUB_H = 3;
 export const SUB_PITCH = 16;
+export const PITCH_MIN = SUB_W + 3;  // crowding floor: circle + min gap, no label collision
 const GAP_LABEL = 9;                 // min gap that fits an embedded ×N label
 const GAP_MIN = 5;                   // min gap for ─▶ + ports
 const GAP_SQUEEZE = 3;
@@ -129,22 +130,30 @@ export interface SubRowLayout {
   circles: Rect[];    // SUB_W × SUB_H sub-node boxes
   labelY: number;     // row for the names under the circles (= tool bottom row when shown===0 — skip drawing)
   shown: number;
+  labelW: number;     // per-circle label width budget (= pitch - 1), 0 when nothing shown
 }
 
 // Skills/agents hang under tool like n8n AI sub-nodes: ◇ port (caller draws it),
 // dashed trunk, rounded tree fan, dashed drops into 3-row circles, names below.
-export function subRow(tool: Rect, n: number, width: number): SubRowLayout {
+// Pitch + label width are derived from the panel width and item count: spread to
+// full labels when slack allows, floor at PITCH_MIN then overflow to caller's +N.
+export function subRow(tool: Rect, n: number, width: number, maxLabelLen: number): SubRowLayout {
   const dx = tool.x + (tool.w >> 1);
   const dy = tool.y + tool.h - 1;
-  const fit = Math.max(0, Math.floor((width - LEFT - 2 - SUB_W) / SUB_PITCH) + 1);
+  const innerSpan = width - LEFT - 2;
+  const fit = Math.max(0, Math.floor((innerSpan - SUB_W) / PITCH_MIN) + 1);
   const shown = Math.min(n, fit);
   const cells: Cell[] = [];
   const circles: Rect[] = [];
-  if (shown === 0) return { cells, circles, labelY: dy, shown };
-  const span = (shown - 1) * SUB_PITCH;
+  if (shown === 0) return { cells, circles, labelY: dy, shown, labelW: 0 };
+  const want = maxLabelLen + 2;                       // full-label pitch target
+  const room = Math.floor(innerSpan / shown);         // per-item slot at this count
+  const pitch = Math.max(PITCH_MIN, Math.min(want, room));
+  const labelW = Math.max(SUB_W, pitch - 1);
+  const span = (shown - 1) * pitch;
   let cx0 = dx - (span >> 1);
   cx0 = Math.max(LEFT + (SUB_W >> 1), Math.min(cx0, width - 2 - ((SUB_W + 1) >> 1) - span));
-  const xs = Array.from({ length: shown }, (_, i) => cx0 + i * SUB_PITCH);
+  const xs = Array.from({ length: shown }, (_, i) => cx0 + i * pitch);
   const fanY = dy + 2;
   cells.push({ x: dx, y: dy + 1, ch: "┆" });
   const lo = Math.min(xs[0]!, dx), hi = Math.max(xs[xs.length - 1]!, dx);
@@ -164,7 +173,7 @@ export function subRow(tool: Rect, n: number, width: number): SubRowLayout {
     cells.push({ x: cx, y: fanY + 1, ch: "┆" });
     circles.push({ x: cx - (SUB_W >> 1), y: fanY + 2, w: SUB_W, h: SUB_H });
   }
-  return { cells, circles, labelY: fanY + 2 + SUB_H, shown };
+  return { cells, circles, labelY: fanY + 2 + SUB_H, shown, labelW };
 }
 
 // ◇ on the sub-node's top border (n8n diamond-to-diamond dashed wires)
