@@ -206,7 +206,7 @@ export function Lens({ presented, cursor, total, animate, lastAdvanceMs, interva
   const nameRows = () => (bigNames ? LABEL_H : 1) + 1; // + detail line
   const blockNeed = () => (mode === "art" ? BOX_H_ART : BOX_H_GLYPH) + Math.max(sub, nameRows()) + 1; // +1 loop channel
   const usable = hudTop - TOP;
-  while (usable - ribbon - econ - heart - time < blockNeed()) {
+  while (usable - ribbon - econ - ctxB - heart - time < blockNeed()) {
     if (bigNames) bigNames = false;
     else if (mode === "art") mode = "glyph";
     else if (econ) econ = 0;

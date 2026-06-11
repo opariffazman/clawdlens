@@ -14,8 +14,11 @@ export function drawCtxBand(buf: OptimizedBuffer, x: number, y: number, tokens: 
   if (v.total <= 0) return;
   drawStr(buf, x, y, "ctx~ ", RGBA.fromHex(theme.dim), w, h);
   let cx = x + 5;
+  let used = 0;
   for (const seg of v.segments) {
-    const cells = Math.round(seg.frac * BAR_W);
+    const cells = Math.min(Math.round(seg.frac * BAR_W), BAR_W - used);
+    if (cells <= 0) continue;
+    used += cells;
     const col = RGBA.fromHex(POOL_HEX[seg.key] ?? theme.dim);
     for (let i = 0; i < cells; i++) drawStr(buf, cx++, y, "▓", col, w, h);
   }
