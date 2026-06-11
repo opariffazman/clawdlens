@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { contextLimit, effectiveContextLimit, contextTokens, addUsage, estimateCostUSD } from "../src/core/tokens";
+import { contextLimit, effectiveContextLimit, contextTokens, addUsage, estimateCostUSD, estimateTokens } from "../src/core/tokens";
 
 test("context limit: 1m variants vs default", () => {
   expect(contextLimit("claude-opus-4-8")).toBe(200_000);
@@ -26,4 +26,10 @@ test("addUsage accumulates", () => {
 test("estimateCostUSD uses model price (opus default)", () => {
   const cost = estimateCostUSD({ input: 1_000_000, output: 0, cacheRead: 0, cacheCreate: 0 }, "claude-opus-4-8");
   expect(cost).toBeCloseTo(15, 5);
+});
+
+test("estimateTokens ~ chars/4, ceil, empty-safe", () => {
+  expect(estimateTokens("")).toBe(0);
+  expect(estimateTokens("abcd")).toBe(1);
+  expect(estimateTokens("abcde")).toBe(2);
 });

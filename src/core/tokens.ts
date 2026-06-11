@@ -47,6 +47,11 @@ export function contextTokens(u: Usage | undefined): number {
   return (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
 }
 
+// rough tokenizer-free estimate (~4 chars/token) for context-pool attribution
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
 export function estimateCostUSD(t: TokenTotals, model: string): number {
   const p = priceFor(model);
   return (t.input * p.in + t.output * p.out + t.cacheRead * p.cacheRead + t.cacheCreate * p.cacheWrite) / MILLION;
