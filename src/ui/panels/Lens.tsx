@@ -117,7 +117,7 @@ function drawRing(buf: OptimizedBuffer, r: Rect, rounded: boolean, now: number, 
   });
 }
 
-function drawSubNode(buf: OptimizedBuffer, c: Rect, it: SubItem, labelY: number, now: number, pulse: boolean, w: number, h: number) {
+function drawSubNode(buf: OptimizedBuffer, c: Rect, it: SubItem, labelY: number, labelW: number, now: number, pulse: boolean, w: number, h: number) {
   const hex = it.live && pulse ? lerpHex(it.hex, theme.pulseHot, breathe(now)) : it.hex;
   const border = RGBA.fromHex(it.live ? hex : theme.dim);
   for (const cell of borderCells(c)) {
@@ -127,7 +127,7 @@ function drawSubNode(buf: OptimizedBuffer, c: Rect, it: SubItem, labelY: number,
   const p = subPortCell(c);
   put(buf, p.x, p.y, "◇", RGBA.fromHex(theme.dim), w, h);
   put(buf, c.x + (c.w >> 1), c.y + (c.h >> 1), it.glyph, RGBA.fromHex(hex), w, h);
-  const lbl = clip(it.label, 14);
+  const lbl = clip(it.label, labelW);
   drawStr(buf, Math.max(0, c.x + (c.w >> 1) - (lbl.length >> 1)), labelY, lbl, RGBA.fromHex(it.live ? theme.fg : theme.dim), w, h);
 }
 
@@ -238,7 +238,8 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
   const regionBottom = hudTop - (econ + ctxB + heart + time);
   const boxH = mode === "art" ? BOX_H_ART : BOX_H_GLYPH;
   const blockH = boxH + Math.max(showSub ? SUB_ROWS : 0, (bigNames ? LABEL_H : 1) + 1);
-  const top = Math.max(regionTop, regionTop + ((regionBottom - regionTop - blockH) >> 1));
+  const loopReserve = 1;
+  const top = Math.max(regionTop + loopReserve, regionTop + loopReserve + ((regionBottom - regionTop - loopReserve - blockH) >> 1));
   const nl: NodeLayout = nodeLayout(width, top, mode);
   const row = nl.row;
 
@@ -263,11 +264,10 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
     if (ia >= 0 && ib >= 0) { if (ib > ia) { hotLo = ia; hotHi = ib - 1; } else hotBack = [a, b]; }
   }
 
-  const sr = showSub ? subRow(nl.boxes.get("tool")!, items.length, width) : null;
-  const nameBottom = top + boxH + (bigNames ? LABEL_H : 1) + 1;
-  const blockBottom = Math.max(nameBottom, sr ? sr.labelY + 1 : 0);
-  const channelY = blockBottom;
-  const loopOn = (backCount > 0 || hotBack !== null) && channelY < regionBottom;
+  const maxLabelLen = items.reduce((m, it) => Math.max(m, [...it.label].length), 0);
+  const sr = showSub ? subRow(nl.boxes.get("tool")!, items.length, width, maxLabelLen) : null;
+  const channelY = top - 1;
+  const loopOn = (backCount > 0 || hotBack !== null) && channelY >= regionTop;
 
   const ringKey = status === "waiting" ? "chat" : activeK && nl.boxes.has(activeK) ? activeK : null;
   const ringMs = status === "waiting" ? RING_WAIT_MS : RING_MS; // waiting spins on the slower period
@@ -318,7 +318,7 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
           const b = nl.boxes.get(lb) ?? nl.boxes.get("think")!;
           const hex = hotBack ? hotHex : lerpHex(theme.wireDim, theme.ok, 0.35);
           const col = RGBA.fromHex(hex);
-          for (const c of wireLoop(a, b, channelY)) put(buffer, c.x, c.y, c.ch, col, width, height);
+          for (const c of wireLoop(a, b, channelY, "above")) put(buffer, c.x, c.y, c.ch, col, width, height);
         }
 
         // sub-row: dashed tree fan + circles
@@ -326,7 +326,7 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
           const d = diamondCell(nl.boxes.get("tool")!);
           const wireDimCol = RGBA.fromHex(theme.wireDim);
           for (const c of sr.cells) put(buffer, c.x, c.y, c.ch, wireDimCol, width, height);
-          sr.circles.forEach((c, i) => drawSubNode(buffer, c, items[i]!, sr.labelY, now, spin, width, height));
+          sr.circles.forEach((c, i) => drawSubNode(buffer, c, items[i]!, sr.labelY, sr.labelW, now, spin, width, height));
           put(buffer, d.x, d.y, "◇", RGBA.fromHex(theme.dim), width, height);
           if (items.length > sr.shown && sr.circles.length > 0) {
             const last = sr.circles[sr.circles.length - 1]!;
