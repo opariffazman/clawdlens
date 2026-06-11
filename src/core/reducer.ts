@@ -27,7 +27,7 @@ function parentDirName(p: string): string {
   return parts.length >= 2 ? parts[parts.length - 2]! : "";
 }
 
-function iconKeyFor(name: string): IconKey {
+export function iconKeyFor(name: string): IconKey {
   switch (name) {
     case "Bash": return "bash";
     case "Edit": case "Write": case "NotebookEdit": return "edit";
