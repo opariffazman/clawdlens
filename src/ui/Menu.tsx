@@ -86,6 +86,7 @@ export function helpRows(): MenuRow[] {
     { id: "h5", left: "pause / play", right: "space" },
     { id: "h6", left: "replay", right: "r" },
     { id: "h6b", left: "jump to live", right: "l" },
+    { id: "h6c", left: "jump to next / prev error", right: "e / E" },
     { id: "h7", left: "lens detail", right: "i" },
     { id: "h8", left: "sessions (with / filter)", right: ": sessions" },
     { id: "h9", left: "help", right: "?" },

@@ -31,3 +31,8 @@ test("dropped keys are unmapped", () => {
     expect(a(k)).toBeNull();
   }
 });
+
+test("error jump keys", () => {
+  expect(a("e")).toEqual({ type: "error-next" });
+  expect(a("e", { shift: true })).toEqual({ type: "error-prev" });
+});
