@@ -114,9 +114,21 @@ function genLabels(): { labels: Record<string, string[]>; h: number } {
   return { labels, h };
 }
 
+// brand wordmark for the header's empty gap (left of the shortcut tips) — same
+// miniwi font as the node labels so it reads as part of the same type family.
+function genWordmark(word: string): string[] {
+  let lines = figlet.textSync(word, { font: "miniwi" as figlet.Fonts }).split("\n").map((l) => l.replace(/\s+$/, ""));
+  while (lines.length && lines[0] === "") lines.shift();
+  while (lines.length && lines[lines.length - 1] === "") lines.pop();
+  const width = Math.max(...lines.map((l) => [...l].length));
+  return lines.map((l) => l.padEnd(width, " "));
+}
+
 const i7 = genIcons(SIZES[0]);
 const i13 = genIcons(SIZES[1]);
 const { labels, h } = genLabels();
+const wordmark = genWordmark("clawdlens");
+const wordmarkW = Math.max(...wordmark.map((l) => [...l].length));
 
 const lit = (o: Record<string, string[]>) =>
   "{\n" + Object.keys(o).sort().map((k) => `  ${JSON.stringify(k)}: ${JSON.stringify(o[k])},`).join("\n") + "\n}";
@@ -135,6 +147,11 @@ export const ICON_ART_13: Record<ArtKey, string[]> = ${lit(i13)};
 export const LABEL_H = ${h};
 
 export const LABEL_ART: Record<"prompt" | "think" | "tool" | "result" | "chat", string[]> = ${lit(labels)};
+
+// brand wordmark (miniwi "clawdlens") for the header's empty gap — ${wordmark.length} rows × ${wordmarkW} cols
+export const WORDMARK: string[] = ${JSON.stringify(wordmark)};
+
+export const WORDMARK_W = ${wordmarkW};
 `;
 await Bun.write(`${import.meta.dir}/../src/ui/panels/lens/iconArt.gen.ts`, file);
 console.log(`wrote iconArt.gen.ts — labels ${h} rows`);

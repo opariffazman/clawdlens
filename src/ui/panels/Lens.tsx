@@ -22,6 +22,7 @@ import { drawSkillTimeline } from "./lens/skillTimeline";
 import { toolTimingsFromBeats } from "../../core/lens-bands";
 import { iconKeyFor } from "../../core/reducer";
 import { fmtDur } from "../format";
+import { VERSION } from "../../version";
 
 interface Props {
   presented: Beat[];
@@ -285,18 +286,21 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
         if (presented.length === 0) {
           const t = "CLAWDLENS";
           const slickM = measureText({ text: t, font: "slick" });
-          const useSlick = slickM.width <= width - 6 && hudTop - TOP >= slickM.height + 3;
+          const useSlick = slickM.width <= width - 6 && hudTop - TOP >= slickM.height + 4;
           const font = useSlick ? "slick" : "tiny";
           const fm = useSlick ? slickM : measureText({ text: t, font: "tiny" });
           const sx = Math.max(LEFT, (width - fm.width) >> 1);
-          const sy = Math.max(TOP, TOP + ((hudTop - TOP - fm.height - 2) >> 1));
+          const sy = Math.max(TOP, TOP + ((hudTop - TOP - fm.height - 3) >> 1));
           renderFontToFrameBuffer(buffer, {
             text: t, x: sx, y: sy, font,
             color: useSlick ? [RGBA.fromHex(theme.coral), RGBA.fromHex(theme.dim)] : RGBA.fromHex(theme.coral),
             backgroundColor: TRANSPARENT,
           });
+          // version badge directly under the wordmark — a tight logo lockup
+          const ver = `v${VERSION}`;
+          drawStr(buffer, Math.max(LEFT, (width - ver.length) >> 1), sy + fm.height, ver, RGBA.fromHex(theme.coral), width, height);
           const hint = "waiting for session activity · : sessions";
-          drawStr(buffer, Math.max(LEFT, (width - hint.length) >> 1), sy + fm.height + 1, hint, RGBA.fromHex(theme.dim), width, height);
+          drawStr(buffer, Math.max(LEFT, (width - hint.length) >> 1), sy + fm.height + 2, hint, RGBA.fromHex(theme.dim), width, height);
           drawHud(buffer, flow, status, 0, total, cursor, width, height);
           return;
         }
