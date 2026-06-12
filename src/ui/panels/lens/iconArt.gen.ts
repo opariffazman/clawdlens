@@ -46,3 +46,8 @@ export const LABEL_ART: Record<"prompt" | "think" | "tool" | "result" | "chat", 
   "think": ["▗ ▌ ▘  ▌ ","▜▘▛▌▌▛▌▙▘","▐▖▌▌▌▌▌▛▖","         "],
   "tool": ["▗     ▜ ","▜▘▛▌▛▌▐ ","▐▖▙▌▙▌▐▖","        "],
 };
+
+// brand wordmark (miniwi "clawdlens") for the header's empty gap — 3 rows × 19 cols
+export const WORDMARK: string[] = ["  ▜       ▌▜       ","▛▘▐ ▀▌▌▌▌▛▌▐ █▌▛▌▛▘","▙▖▐▖█▌▚▚▘▙▌▐▖▙▖▌▌▄▌"];
+
+export const WORDMARK_W = 19;

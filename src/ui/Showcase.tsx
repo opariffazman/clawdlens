@@ -55,7 +55,7 @@ export function Showcase({ session, panel, presented, cursor, playerTotal, infoO
   const bodyHeight = Math.max(1, height - 6 - (paletteOpen ? 3 : 0));
   return (
     <box style={{ flexGrow: 1, flexDirection: "column", backgroundColor: TRANSPARENT }}>
-      <Header session={session} panel={panel} marker={marker} reveal={reveal} locked={focusLocked} />
+      <Header session={session} panel={panel} marker={marker} reveal={reveal} locked={focusLocked} width={width} />
       {/* command palette sits ABOVE the panel (y-axis), pushing tabs + frame down */}
       {paletteOpen && <CommandBox query={paletteQuery} ghost={paletteGhost} width={width} />}
       <TabBar panels={PANELS} active={panel} width={width} />

@@ -4,6 +4,12 @@
 [![npm](https://img.shields.io/npm/v/clawdlens.svg)](https://www.npmjs.com/package/clawdlens)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+<p align="center">
+  <img src="assets/hero.png"
+       alt="ClawdLens at rest — header wordmark, panel tabs, the CLAWDLENS lens splash and NOW heads-up display, waiting for session activity"
+       width="900">
+</p>
+
 Terminal glass box for Claude Code sessions. Passive observer — tails
 `~/.claude/projects/**/*.jsonl` and shows, at a calm slow-burn pace, what each running
 session is doing. Zero setup. No hooks. Never leave the terminal.
