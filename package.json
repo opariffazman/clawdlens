@@ -1,6 +1,6 @@
 {
   "name": "clawdlens",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": false,
   "type": "module",
   "description": "Terminal glass box for Claude Code sessions — live flow, status, files, tasks, git, and a superpowers phase lens. Passive observer, zero setup.",
