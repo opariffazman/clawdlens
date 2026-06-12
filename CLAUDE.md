@@ -76,7 +76,15 @@ docs/superpowers/{specs,plans}/  design specs + impl plans
 - **Use superpowers skills whenever relevant** (not optional): `brainstorming` before any new feature/behaviour; `systematic-debugging` for ANY bug/test-failure/unexpected behaviour (root cause before fix — no guess-and-check); `test-driven-development` before impl; `writing-plans`/`executing-plans` for multi-step work; `verification-before-completion` before claiming done. Invoke via the `Skill` tool.
 - **Use the `opentui` skill for ANY OpenTUI work** (rendering, buffers, layout, keymaps, capabilities) — its `docs/**/*.mdx` are source of truth; don't guess the API.
 - **TDD pure core** — failing test first. Workflow: brainstorm → spec → plan → subagent-driven build. specs/plans in `docs/superpowers/`.
-- **Verify TUI visually via tmux** (agent has no TTY): `tmux new-session -d -s cl -x 150 -y 36 "bun run dev"; sleep 4; tmux capture-pane -t cl -p`. Use `-e` + diff two frames for colour/pulse animation. `tmux send-keys` to drive keys.
+- **Verify TUI visually via tmux** (agent has no TTY). The detached session is ephemeral and flaky **mid-run**: it gets **resized to a narrow default (~80) or killed entirely** between Bash calls — not just the ClawdLens window, the whole session. Two rules make it survive: (1) launch the app via `send-keys` into a **shell**, never as the `new-session` command — when `bun run dev` exits/crashes the window stays alive instead of taking the session down with it; (2) **re-assert the size right before every `capture-pane`**, since it drifts. The session holds no state, so just recreate it when gone:
+  ```bash
+  tmux has-session -t cl 2>/dev/null || tmux new-session -d -s cl -x 150 -y 40
+  tmux setw -t cl window-size manual; tmux set -t cl remain-on-exit on   # pin size; keep a crashed pane to read
+  tmux send-keys -t cl 'bun run dev' Enter; sleep 5
+  tmux resize-window -t cl -x 150 -y 40                                   # counter the drift
+  tmux capture-pane -t cl -p
+  ```
+  Use `-e` + diff two frames for colour/pulse animation. `tmux send-keys -t cl <key>` to drive keys (`i` detail, `Tab` panels, etc.). Wrap any capture sequence with the `has-session`-recreate + `resize-window` guard — a bare `capture-pane` on a dead/shrunk session is the common failure.
 - **Transparent canvas** — inherit terminal bg (OLED). Don't paint bg except selection/overlay accents.
 - Conventional commits, per task. Public repo `origin` = `github.com:opariffazman/clawdlens`. Branch → PR (CI gates: typecheck + test) → merge to main. See Release.
 
