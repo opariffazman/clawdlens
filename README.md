@@ -62,22 +62,52 @@ CL_ICONS=unicode clawdlens
 ## Panels
 
 `Tab`/`Shift-Tab` cycles five views of the selected session. All panels share one timeline
-cursor — they reveal and animate in sync.
+cursor — they reveal and animate in sync. The shots below all replay the same rich session:
+clawdlens building itself.
 
-- **Lens** *(default)* — node / pipeline visual workflow canvas. Trigger half-pill plus
-  stage boxes (prompt → think → tool → result → chat) in braille [lucide](https://lucide.dev)
-  icons, green trail wires labelled with traversal counts, coral ring orbiting the active
-  node. Skills and subagents hang off as dashed sub-nodes; `i` flips the sub-row to a
-  per-tool breakdown. Above: phase ribbon and skill-timeline bands. Below: NOW heads-up
-  display (live status and pace). Long think → the box breathes.
-- **Files** — heatmap of every file the session touched, ranked by edits (`:sort` re-ranks
-  by reads or recency).
-- **Tasks** — agnostic task list, reconstructed from TodoWrite, harness
-  TaskCreate/TaskUpdate events, and a superpowers-phase fallback.
-- **Git** — commit-graph of the session's repo, lanes coloured per branch, builds up with
-  a pulse.
-- **Log** — raw event stream (thinking / text / tool / skill / result) with an energy pulse
-  while the timeline moves.
+### Lens *(default)*
+
+<p align="center"><img src="assets/panels/lens.png" alt="ClawdLens Lens panel — superpowers phase ribbon, the prompt → think → tool → result → chat pipeline with traversal counts, skill-timeline band and NOW heads-up display" width="900"></p>
+
+Node / pipeline visual workflow canvas. Trigger half-pill plus stage boxes
+(prompt → think → tool → result → chat) in braille [lucide](https://lucide.dev) icons,
+green trail wires labelled with traversal counts, coral ring orbiting the active node.
+Skills and subagents hang off as dashed sub-nodes. Above: the phase ribbon
+(Brainstorm → Spec → Plan → Execute → Review → Ship) and skill-timeline bands. Below: the
+NOW heads-up display (live status and pace). Long think → the box breathes.
+
+Press `i` to flip the sub-row into a per-tool breakdown — every tool the session used, with
+call counts and average durations:
+
+<p align="center"><img src="assets/panels/lens-tools.png" alt="ClawdLens Lens panel with i pressed — the sub-row expanded into a per-tool breakdown fan: Bash, Read, Edit, Write, WebSearch, WebFetch, Task and more with call counts and average durations" width="900"></p>
+
+### Files
+
+<p align="center"><img src="assets/panels/files.png" alt="ClawdLens Files panel — heatmap of every file the session touched, ranked by edits with read/edit counts" width="900"></p>
+
+Heatmap of every file the session touched, ranked by edits (`:sort` re-ranks by reads or
+recency).
+
+### Tasks
+
+<p align="center"><img src="assets/panels/tasks.png" alt="ClawdLens Tasks panel — agnostic task list reconstructed from TodoWrite and harness TaskCreate/TaskUpdate events, all 32 complete" width="900"></p>
+
+Agnostic task list, reconstructed from TodoWrite, harness TaskCreate/TaskUpdate events, and
+a superpowers-phase fallback (`:hide-done` collapses the completed ones).
+
+### Git
+
+<p align="center"><img src="assets/panels/git.png" alt="ClawdLens Git panel — commit-graph of the session's repo, lanes coloured per branch, with conventional-commit subjects, tags and merge points" width="900"></p>
+
+Commit-graph of the session's repo, lanes coloured per branch, builds up with a pulse
+(`:scope` toggles all-branches vs current).
+
+### Log
+
+<p align="center"><img src="assets/panels/log.png" alt="ClawdLens Log panel — raw event stream of thinking, text, tool, skill and result beats with an energy pulse while the timeline moves" width="900"></p>
+
+Raw event stream (thinking / text / tool / skill / result) with an energy pulse while the
+timeline moves.
 
 ## Keys
 
