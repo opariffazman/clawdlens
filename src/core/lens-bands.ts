@@ -100,6 +100,24 @@ export function toolTimingView(timings: Record<string, ToolTiming>): ToolTimingR
     .sort((a, b) => b.totalMs - a.totalMs);
 }
 
+// cursor-bounded twin of toolTimingView: aggregate per-tool timings from the
+// resolved tool beats revealed up to `cursor`, so the Lens info sub-row reveals
+// tools in cadence with the timeline rather than dumping the whole session.
+export function toolTimingsFromBeats(beats: Beat[], cursor: number): ToolTimingRow[] {
+  const n = Math.min(Math.max(0, cursor), beats.length);
+  const acc: Record<string, ToolTiming> = {};
+  for (let i = 0; i < n; i++) {
+    const b = beats[i]!;
+    if (b.kind !== "tool" || b.durMs === undefined) continue;
+    const d = b.durMs;
+    const cur = acc[b.label];
+    acc[b.label] = cur
+      ? { count: cur.count + 1, totalMs: cur.totalMs + d, minMs: Math.min(cur.minMs, d), maxMs: Math.max(cur.maxMs, d) }
+      : { count: 1, totalMs: d, minMs: d, maxMs: d };
+  }
+  return toolTimingView(acc);
+}
+
 export interface EconomyView { inTok: string; outTok: string; cachePct: number; web: number }
 
 export function kfmt(n: number): string { return n >= 1000 ? Math.round(n / 1000) + "k" : String(n); }

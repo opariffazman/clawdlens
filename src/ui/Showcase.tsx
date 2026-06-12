@@ -66,7 +66,7 @@ export function Showcase({ session, panel, presented, cursor, playerTotal, infoO
           paddingLeft: 1, paddingRight: 1, backgroundColor: TRANSPARENT,
         }}
       >
-        {panel === "lens" && <Lens presented={presented} cursor={cursor} total={playerTotal} animate={animate} live={live} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} status={session.status} infoOn={infoOn} tokens={agg.tokens} ctxPools={agg.ctxPools} toolTimings={agg.toolTimings} width={width - 4} height={bodyHeight} />}
+        {panel === "lens" && <Lens presented={presented} cursor={cursor} total={playerTotal} animate={animate} live={live} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} status={session.status} infoOn={infoOn} tokens={agg.tokens} ctxPools={agg.ctxPools} width={width - 4} height={bodyHeight} />}
         {panel === "log" && <Flow beats={presented} cursor={cursor} animate={animate} lastAdvanceMs={lastAdvanceMs} intervalMs={intervalMs} width={width - 4} height={bodyHeight} />}
         {panel === "files" && <Files heat={agg.fileHeat} height={bodyHeight} progress={progress} sort={filesSort} />}
         {panel === "tasks" && <Tasks todos={agg.todos} lens={agg.lens} height={bodyHeight} progress={progress} hideDone={tasksHideDone} />}

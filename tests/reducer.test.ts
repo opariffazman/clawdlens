@@ -236,6 +236,24 @@ test("tool_use→tool_result pairs fold per-tool durations", () => {
   expect(s.toolTimings["Bash"]).toEqual({ count: 2, totalMs: 8000, minMs: 2000, maxMs: 6000 });
 });
 
+test("resolved tool beat carries its duration (durMs); unresolved stays undefined", () => {
+  const s = feed([
+    { type: "assistant", timestamp: "2026-06-06T00:00:00Z", message: { content: [
+      { type: "tool_use", id: "t1", name: "Bash", input: { command: "ls" } },
+    ] } },
+    { type: "user", timestamp: "2026-06-06T00:00:02Z", message: { content: [
+      { type: "tool_result", tool_use_id: "t1" },
+    ] } },
+    { type: "assistant", timestamp: "2026-06-06T00:00:03Z", message: { content: [
+      { type: "tool_use", id: "t2", name: "Read", input: { file_path: "/a" } }, // never resolved
+    ] } },
+  ]);
+  const bash = s.beats.find((b) => b.label === "Bash")!;
+  const read = s.beats.find((b) => b.label === "Read")!;
+  expect(bash.durMs).toBe(2000);
+  expect(read.durMs).toBeUndefined();
+});
+
 test("unresolved tool_use contributes no timing", () => {
   const s = feed([
     { type: "assistant", timestamp: "2026-06-06T00:00:00Z", message: { content: [

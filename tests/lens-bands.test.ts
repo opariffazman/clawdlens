@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { tsToX, lensTimeline, heartbeatBuckets, economyView, toolTimingView, ctxBreakdownView } from "../src/core/lens-bands";
+import { tsToX, lensTimeline, heartbeatBuckets, economyView, toolTimingView, toolTimingsFromBeats, ctxBreakdownView } from "../src/core/lens-bands";
 import type { Beat } from "../src/core/types";
 import { newSessionTokens } from "../src/core/types";
 
@@ -94,6 +94,29 @@ test("toolTimingView sorts bottleneck-first and derives avg", () => {
   });
   expect(rows.map((r) => r.name)).toEqual(["Bash", "Read"]);
   expect(rows[0]).toEqual({ name: "Bash", count: 2, avgMs: 4500, minMs: 1000, maxMs: 8000, totalMs: 9000 });
+});
+
+test("toolTimingsFromBeats only counts resolved tool beats up to the cursor", () => {
+  const beats = [
+    beat({ id: "b1", kind: "tool", label: "Bash", durMs: 1000, ts: 1 }),
+    beat({ id: "b2", kind: "tool", label: "Read", durMs: 200, ts: 2 }),
+    beat({ id: "b3", kind: "tool", label: "Bash", durMs: 3000, ts: 3 }),  // beyond cursor → excluded
+    beat({ id: "b4", kind: "tool", label: "Read", durMs: 400, ts: 4 }),   // beyond cursor → excluded
+  ];
+  const rows = toolTimingsFromBeats(beats, 2); // only b1, b2 revealed
+  expect(rows.map((r) => r.name)).toEqual(["Bash", "Read"]); // bottleneck-first
+  expect(rows[0]).toEqual({ name: "Bash", count: 1, avgMs: 1000, minMs: 1000, maxMs: 1000, totalMs: 1000 });
+  expect(rows[1]!.count).toBe(1);
+});
+
+test("toolTimingsFromBeats skips unresolved tools and non-tool beats", () => {
+  const beats = [
+    beat({ id: "t1", kind: "thinking", label: "thinking", ts: 1 }),
+    beat({ id: "t2", kind: "tool", label: "Bash", ts: 2 }),                 // unresolved (no durMs)
+    beat({ id: "t3", kind: "tool", label: "Bash", durMs: 500, ts: 3 }),
+  ];
+  const rows = toolTimingsFromBeats(beats, beats.length);
+  expect(rows).toEqual([{ name: "Bash", count: 1, avgMs: 500, minMs: 500, maxMs: 500, totalMs: 500 }]);
 });
 
 test("ctxBreakdownView: residual system pool, clamped at 0, ordered", () => {
