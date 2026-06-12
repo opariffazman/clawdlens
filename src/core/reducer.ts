@@ -280,11 +280,11 @@ function foldUser(s: SessionState, e: Entry, ts: number) {
     const p = s.pendingTools[id];
     if (p) {
       if (main) bumpPool(s, p.name === "Task" ? "subagents" : "tools", estimateTokens(resultText(b.content)));
-      s.beats = s.beats.map(bt => bt.id === p.beatId ? { ...bt, ok: !b.is_error } : bt);
       // timestamp-less entries fold with ts=0 (whole-file load) — a real-epoch
       // counterpart would yield a decades-long garbage duration; skip those pairs
-      if (p.ts > 0 && ts > 0) {
-        const durMs = Math.max(0, ts - p.ts);
+      const durMs = p.ts > 0 && ts > 0 ? Math.max(0, ts - p.ts) : undefined;
+      s.beats = s.beats.map(bt => bt.id === p.beatId ? { ...bt, ok: !b.is_error, ...(durMs !== undefined ? { durMs } : {}) } : bt);
+      if (durMs !== undefined) {
         const cur = s.toolTimings[p.name];
         s.toolTimings = {
           ...s.toolTimings,

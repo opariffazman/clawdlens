@@ -70,6 +70,7 @@ export interface Beat {
   lane: string;                  // "main" or a subagent lane id (Task tool_use id)
   toolUseId?: string;            // for tool beats, to pair with result
   ok?: boolean;                  // result success (tool beats, after pairing)
+  durMs?: number;                // resolved tool duration (tool beats, after pairing) — cursor-bounded timing
   skill?: string;                // attributionSkill if present
   milestone?: "commit" | "branch"; // Bash git commit/branch-create, for Lens bloom/spark
   snap?: BeatSnap;               // cumulative cost/ctx as of this beat (reveal animation)

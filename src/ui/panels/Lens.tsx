@@ -19,7 +19,7 @@ import { drawEconomy } from "./lens/economy";
 import { drawCtxBand } from "./lens/ctxBand";
 import { drawHeartbeat } from "./lens/heartbeat";
 import { drawSkillTimeline } from "./lens/skillTimeline";
-import { toolTimingView } from "../../core/lens-bands";
+import { toolTimingsFromBeats } from "../../core/lens-bands";
 import { iconKeyFor } from "../../core/reducer";
 import { fmtDur } from "../format";
 
@@ -35,7 +35,6 @@ interface Props {
   infoOn: boolean;
   tokens: import("../../core/types").SessionTokens;
   ctxPools: import("../../core/types").CtxPools;
-  toolTimings: Record<string, import("../../core/types").ToolTiming>;
   width: number;
   height: number;
 }
@@ -166,7 +165,7 @@ function drawHud(buf: OptimizedBuffer, flow: ReturnType<typeof deriveFlow>, stat
   drawStr(buf, cx, top + 2, clip(rest, w - cx - 3), RGBA.fromHex(theme.dim), w, h);
 }
 
-export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, intervalMs, status, infoOn, tokens, ctxPools, toolTimings, width, height }: Props) {
+export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, intervalMs, status, infoOn, tokens, ctxPools, width, height }: Props) {
   const flow = deriveFlow(presented, cursor, TRAIL_HOPS, "coarse");
   const lensState = detectLensFromBeats(presented.slice(0, cursor));
   const ribbonOn = lensState.lensId === "superpowers";
@@ -177,7 +176,7 @@ export function Lens({ presented, cursor, total, animate, live, lastAdvanceMs, i
   // sub-row occupants: default = latest skill + live agents; `i` = tool breakdown
   const items: SubItem[] = [];
   if (infoOn) {
-    const rows = toolTimingView(toolTimings);
+    const rows = toolTimingsFromBeats(presented, cursor);
     if (rows.length > 0) {
       for (const r of rows) {
         items.push({ glyph: iconFor(iconKeyFor(r.name)), label: `${r.name} ×${r.count} ${fmtDur(r.avgMs)}`, live: false, hex: laneHexOf("tool") });
